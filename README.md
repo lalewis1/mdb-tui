@@ -154,6 +154,7 @@ When you select a column, the right panel shows:
 - The application connects in read-only mode to prevent accidental modifications
 - Only the first 100 rows of each table are displayed for performance
 - You may need to install the appropriate ODBC driver for your operating system
+- **Debug Logging**: Debug messages are displayed in a panel at the bottom of the screen
 
 ## Known Limitations
 

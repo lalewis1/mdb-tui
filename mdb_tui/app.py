@@ -6,16 +6,15 @@ import sys
 import os
 from textual.app import App, ComposeResult
 from textual.containers import Container, ScrollableContainer
-from textual.widgets import Header, Footer, Tree, DataTable, Input, Label
+from textual.widgets import Header, Footer, Tree, DataTable, Input, Label, Log
 from textual.binding import Binding
 
-# Configure logging
+# Configure logging - we'll let Textual handle the logging display
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('mdb-tui.debug.log'),
-        logging.StreamHandler()
+        logging.FileHandler('mdb-tui.debug.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -63,6 +62,7 @@ class DatabaseExplorer(App):
             ),
             id="main-container"
         )
+        yield Log(id="debug-log")
         yield Footer()
     
     def on_mount(self) -> None:
@@ -177,6 +177,8 @@ class DatabaseExplorer(App):
         """Handle table expansion to load columns."""
         node = event.node
         
+        logger.info(f"Node expanded: {node.label} (type: {node.data.get('type') if node.data else 'no data'})")
+        
         # Check if this is a table node being expanded
         if (node.data and node.data.get("type") == "table" and 
             node.children and node.children[0].data.get("type") == "placeholder"):
@@ -186,6 +188,7 @@ class DatabaseExplorer(App):
             
             try:
                 columns = self._get_table_columns(table_name)
+                logger.info(f"Found {len(columns)} columns: {columns}")
                 
                 # Remove the placeholder
                 placeholder = node.children[0]
@@ -200,15 +203,18 @@ class DatabaseExplorer(App):
                         "name": column
                     }
                     column_node.allow_expand = False
+                    logger.debug(f"Added column node: {column}")
                     
             except Exception as e:
-                logger.error(f"Error loading columns for table {table_name}: {e}")
+                logger.error(f"Error loading columns for table {table_name}: {e}", exc_info=True)
                 # Remove placeholder and add error node
                 placeholder = node.children[0]
                 placeholder.remove()
                 error_node = node.add(f"❌ Error loading columns: {e}")
                 error_node.data = {"type": "error"}
                 error_node.allow_expand = False
+        else:
+            logger.info(f"Node not a table or already expanded: {node.label}")
     
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle table/column selection from tree view."""
@@ -332,10 +338,12 @@ class DatabaseExplorer(App):
         
         if tree.has_focus:
             logger.debug("Collapsing node in tree view")
+            cursor_node = tree.cursor_node
             # For tree view, left means collapse if expanded, otherwise move left
-            if tree.cursor_node and tree.cursor_node.is_expanded:
+            if cursor_node and cursor_node.is_expanded:
                 tree.action_toggle_node()
-            else:
+            elif cursor_node and cursor_node != tree.root:
+                # Only try to move left if not on root node
                 tree.action_cursor_left()
         else:
             logger.debug("Moving left in data table")
