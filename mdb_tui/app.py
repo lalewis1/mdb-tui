@@ -589,8 +589,8 @@ class DatabaseExplorer(App):
         }
         stat_sql = columns_sql = ""
         try:
-            # Columns SQL for pyodbc would be the ODBC columns() call, but simulate as actual SQL
-            columns_sql = f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{table_name}'"
+            # Columns SQL for MS Access/pyodbc
+            columns_sql = f"pyodbc.columns(table='{table_name}')"
             # Data type stats Access-compatible SQL for demonstration (distinct count uses subquery):
             safe_table = self._quote_identifier(table_name)
             safe_column = self._quote_identifier(column_name)
