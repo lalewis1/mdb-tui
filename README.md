@@ -16,6 +16,29 @@ A read-only TUI application for exploring Microsoft Access databases from the co
 - Microsoft Access ODBC Driver (for .mdb/.accdb files)
 - uv package manager
 
+### Windows Specific Requirements
+
+For Windows, you need to install the appropriate Access Database Engine:
+
+- **For Office 2010**: [Microsoft Access Database Engine 2010](https://www.microsoft.com/en-us/download/details.aspx?id=13255)
+- **For Office 2016/2019/365**: [Microsoft Access Database Engine 2016](https://www.microsoft.com/en-us/download/details.aspx?id=54920)
+
+### Important Notes About 32-bit vs 64-bit
+
+**The application automatically detects your Python architecture and selects the appropriate driver:**
+
+- **32-bit Python**: Uses `Microsoft Access Driver (*.mdb)` (older driver, no .accdb support)
+- **64-bit Python**: Uses `Microsoft Access Driver (*.mdb, *.accdb)` (newer driver with .accdb support)
+
+**Recommendations:**
+- Use **64-bit Python** for best compatibility with both .mdb and .accdb files
+- If you must use 32-bit Python, stick with .mdb files as the older driver may not support .accdb files
+- Install the Access Database Engine version that matches your Python architecture (32-bit or 64-bit)
+
+**Troubleshooting:**
+- If you get driver not found errors, check your Python architecture: `python -c "import sys; print('32-bit' if sys.maxsize <= 2**32 else '64-bit')"`
+- Install the corresponding version of Access Database Engine
+
 ## Installation
 
 ```bash
@@ -37,7 +60,19 @@ python main.py path/to/your/database.mdb
 
 # Or use the installed command
 mdb-tui path/to/your/database.accdb
+
+# Windows example (Git Bash)
+python main.py "C:/path/to/database.mdb"
 ```
+
+### Debugging
+
+If the application exits without error:
+
+1. Check the debug log: `mdb-tui.debug.log`
+2. Run with verbose logging: `python -m mdb_tui.app your_database.mdb`
+3. Verify ODBC drivers are installed: `python -c "import pyodbc; print(pyodbc.drivers())"`
+4. Check file permissions and path accessibility
 
 ## Keybindings
 
