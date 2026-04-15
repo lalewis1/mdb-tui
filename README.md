@@ -132,6 +132,26 @@ If the application exits without error:
 - Only the first 100 rows of each table are displayed for performance
 - You may need to install the appropriate ODBC driver for your operating system
 
+## Known Limitations
+
+1. **Column Highlighting**: Basic notification-based column selection (visual highlighting coming soon)
+2. **Tree Navigation**: Uses Textual's built-in tree navigation (some advanced features may be limited)
+3. **Large Databases**: May need optimization for databases with hundreds of tables
+
+## Troubleshooting
+
+### "AttributeError: property 'cursor_node' of 'Tree' object has no setter"
+This error was fixed by using Textual's built-in tree navigation actions instead of direct cursor manipulation.
+
+### "TypeError: TreeNode.remove() takes 1 positional argument but 2 were given"
+This error was fixed by calling `node.remove()` instead of `parent.remove(child)`.
+
+### If you encounter other issues:
+1. Check `mdb-tui.debug.log` for detailed error information
+2. Verify ODBC drivers are installed: `python -c "import pyodbc; print(pyodbc.drivers())"`
+3. Try with a simple database file first
+4. Report the issue with the debug log attached
+
 ## License
 
 MIT

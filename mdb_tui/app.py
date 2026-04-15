@@ -181,7 +181,8 @@ class DatabaseExplorer(App):
                 columns = self._get_table_columns(table_name)
                 
                 # Remove the placeholder
-                node.remove(node.children[0])
+                placeholder = node.children[0]
+                placeholder.remove()
                 
                 # Add column nodes
                 for column in columns:
@@ -196,7 +197,8 @@ class DatabaseExplorer(App):
             except Exception as e:
                 logger.error(f"Error loading columns for table {table_name}: {e}")
                 # Remove placeholder and add error node
-                node.remove(node.children[0])
+                placeholder = node.children[0]
+                placeholder.remove()
                 error_node = node.add(f"❌ Error loading columns: {e}")
                 error_node.data = {"type": "error"}
                 error_node.allow_expand = False
@@ -323,13 +325,11 @@ class DatabaseExplorer(App):
         
         if tree.has_focus:
             logger.debug("Collapsing node in tree view")
-            # For tree view, left means collapse the current node
+            # For tree view, left means collapse if expanded, otherwise move left
             if tree.cursor_node and tree.cursor_node.is_expanded:
                 tree.action_toggle_node()
             else:
-                # If node is already collapsed, move to parent
-                if tree.cursor_node and tree.cursor_node.parent:
-                    tree.cursor_node = tree.cursor_node.parent
+                tree.action_cursor_left()
         else:
             logger.debug("Moving left in data table")
             data_table.action_cursor_left()
@@ -344,13 +344,13 @@ class DatabaseExplorer(App):
             cursor_node = tree.cursor_node
             
             if cursor_node:
-                # If it's a table node, expand it to show columns
+                # If it's a table node that's not expanded, expand it to show columns
                 if (cursor_node.data and cursor_node.data.get("type") == "table" and 
                     not cursor_node.is_expanded):
                     tree.action_toggle_node()
-                # If it's already expanded and has children, move to first child
-                elif cursor_node.children:
-                    tree.cursor_node = cursor_node.children[0]
+                else:
+                    # Otherwise use default right behavior (move to child or right)
+                    tree.action_cursor_right()
         else:
             logger.debug("Moving right in data table")
             data_table.action_cursor_right()
