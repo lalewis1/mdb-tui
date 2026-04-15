@@ -32,6 +32,7 @@ class DatabaseExplorer(App):
         Binding("G", "end", "End", show=False),
         Binding("/", "search", "Search", show=False),
         Binding("s", "show_stats", "Show Stats", show=True),
+        Binding("escape", "return_to_tree", "Return to Tree", show=False),
     ]
 
     def __init__(self, db_path: str):
@@ -590,14 +591,15 @@ class DatabaseExplorer(App):
         try:
             # Columns SQL for pyodbc would be the ODBC columns() call, but simulate as actual SQL
             columns_sql = f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{table_name}'"
-            # Data type stats SQL for demonstration (pyodbc gets all rows, so emulate basic stats)
+            # Data type stats Access-compatible SQL for demonstration (distinct count uses subquery):
             safe_table = self._quote_identifier(table_name)
             safe_column = self._quote_identifier(column_name)
+            # Distinct subquery for Access
+            distinct_sql = f"SELECT COUNT(*) AS distinct_count FROM (SELECT DISTINCT {safe_column} FROM {safe_table} WHERE {safe_column} IS NOT NULL AND {safe_column} <> '') AS DQ"
             stat_sql = (
                 f"SELECT COUNT(*) as row_count, "
-                f"SUM(IIF({safe_column} IS NULL OR {safe_column}='',1,0)) as null_count, "
-                f"COUNT(DISTINCT {safe_column}) as distinct_count "
-                f"FROM {safe_table}"
+                f"SUM(IIF({safe_column} IS NULL OR {safe_column}='',1,0)) as null_count "
+                f"FROM {safe_table};\n" + distinct_sql
             )
             # Actually run the stats in Python for now (mimic result as SQL would)
             col_index = None
