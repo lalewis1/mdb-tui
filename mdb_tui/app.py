@@ -178,11 +178,16 @@ class DatabaseExplorer(App):
             logger.info(f"Loading data from table: {self.current_table}")
             cursor = self.connection.cursor()
             
+            # Properly quote the table name to prevent SQL injection
+            # For Access, we use square brackets for quoting
+            safe_table_name = self._quote_identifier(self.current_table)
+            logger.debug(f"Using safe table name: {safe_table_name}")
+            
             # Try TOP 100 for Access, fallback to LIMIT 100 for other databases
             try:
-                cursor.execute(f"SELECT TOP 100 * FROM {self.current_table}")
+                cursor.execute(f"SELECT TOP 100 * FROM {safe_table_name}")
             except pyodbc.Error:
-                cursor.execute(f"SELECT * FROM {self.current_table} LIMIT 100")
+                cursor.execute(f"SELECT * FROM {safe_table_name} LIMIT 100")
             
             # Get column names
             columns = [column[0] for column in cursor.description]
@@ -254,25 +259,37 @@ class DatabaseExplorer(App):
             data_table.action_cursor_up()
     
     def action_left(self) -> None:
-        """Move left (vim h)."""
+        """Move left/collapse (vim h)."""
         tree = self.query_one("#db-tree", Tree)
         data_table = self.query_one("#data-view", DataTable)
         
         if tree.has_focus:
-            logger.debug("Moving left in tree view")
-            tree.action_cursor_left()
+            logger.debug("Collapsing node in tree view")
+            # For tree view, left means collapse the current node
+            if tree.cursor_node and tree.cursor_node.is_expanded:
+                tree.action_toggle_node()
+            else:
+                # If node is already collapsed, move to parent
+                if tree.cursor_node and tree.cursor_node.parent:
+                    tree.cursor_node = tree.cursor_node.parent
         else:
             logger.debug("Moving left in data table")
             data_table.action_cursor_left()
     
     def action_right(self) -> None:
-        """Move right (vim l)."""
+        """Move right/expand (vim l)."""
         tree = self.query_one("#db-tree", Tree)
         data_table = self.query_one("#data-view", DataTable)
         
         if tree.has_focus:
-            logger.debug("Moving right in tree view")
-            tree.action_cursor_right()
+            logger.debug("Expanding node in tree view")
+            # For tree view, right means expand the current node
+            if tree.cursor_node and not tree.cursor_node.is_expanded:
+                tree.action_toggle_node()
+            else:
+                # If node is already expanded, move to first child
+                if tree.cursor_node and tree.cursor_node.children:
+                    tree.cursor_node = tree.cursor_node.children[0]
         else:
             logger.debug("Moving right in data table")
             data_table.action_cursor_right()
@@ -300,6 +317,19 @@ class DatabaseExplorer(App):
         else:
             logger.debug("Going to end in data table")
             data_table.action_cursor_end()
+    
+    def _quote_identifier(self, identifier: str) -> str:
+        """Properly quote SQL identifiers to prevent injection and handle special characters."""
+        if not identifier:
+            return ""
+        
+        # Always quote identifiers for safety
+        # For Access databases, we use square brackets
+        # Escape any existing brackets by doubling them
+        safe_identifier = identifier.replace("]", "]]")
+        
+        # Always wrap in brackets for Access SQL
+        return f"[{safe_identifier}]"
 
 
 def main():

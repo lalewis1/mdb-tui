@@ -102,6 +102,7 @@ If the application exits without error:
 
 ## Notes
 
+- **Security**: All table names are properly quoted and escaped to prevent SQL injection
 - The application connects in read-only mode to prevent accidental modifications
 - Only the first 100 rows of each table are displayed for performance
 - You may need to install the appropriate ODBC driver for your operating system
