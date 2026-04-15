@@ -59,11 +59,13 @@ class DatabaseExplorer(App):
         dock: left;
     }
     
-    #data-panel {
-        width: 70%;
-        dock: right;
+    DataTable.unfocused-datatable {
+        background: $surface-dark 80%;
+        color: $text 40%;
+        opacity: 0.65;
+        transition: opacity 0.15s;
     }
-    """
+
     
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -367,6 +369,12 @@ class DatabaseExplorer(App):
         logger.debug("Returning focus to tree view")
         tree = self.query_one("#db-tree", Tree)
         tree.focus()
+        # Darken the data table since tree has focus.
+        try:
+            data_table = self.query_one("#data-view", DataTable)
+            data_table.add_class("unfocused-datatable")
+        except Exception:
+            pass
     
     def action_down(self) -> None:
         """Move down (vim j)."""
@@ -493,6 +501,7 @@ class DatabaseExplorer(App):
         try:
             data_table = self.query_one("#data-view", DataTable)
             data_table.focus()
+            data_table.remove_class("unfocused-datatable")
             logger.debug("Focus set to data table")
         except Exception as e:
             logger.error(f"Error focusing data table: {e}")
