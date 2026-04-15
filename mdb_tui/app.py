@@ -368,13 +368,10 @@ class DatabaseExplorer(App):
     def on_key(self, event):
         from textual.events import Key
 
-        if isinstance(event, Key):
-            if event.key == "s":
-                # Always trigger stats for the current selection
-                self.action_show_stats()
-                event.stop()
-                return
-        super().on_key(event)
+        if isinstance(event, Key) and event.key == "s":
+            # Always trigger stats for the current selection
+            self.action_show_stats()
+            event.stop()
 
 
 def main():
