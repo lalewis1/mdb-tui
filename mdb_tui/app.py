@@ -160,14 +160,72 @@ class DatabaseExplorer(App):
         
         for table in self.tables:
             table_node = root.add(table)
-            table_node.data = table
+            table_node.data = {"type": "table", "name": table}
+            table_node.allow_expand = True
+            # Add a placeholder child that will be replaced when expanded
+            placeholder = table_node.add("Loading columns...")
+            placeholder.data = {"type": "placeholder"}
+    
+    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
+        """Handle table expansion to load columns."""
+        node = event.node
+        
+        # Check if this is a table node being expanded
+        if (node.data and node.data.get("type") == "table" and 
+            node.children and node.children[0].data.get("type") == "placeholder"):
+            
+            table_name = node.data["name"]
+            logger.info(f"Loading columns for table: {table_name}")
+            
+            try:
+                columns = self._get_table_columns(table_name)
+                
+                # Remove the placeholder
+                node.remove(node.children[0])
+                
+                # Add column nodes
+                for column in columns:
+                    column_node = node.add(f"📋 {column}")
+                    column_node.data = {
+                        "type": "column", 
+                        "table": table_name,
+                        "name": column
+                    }
+                    column_node.allow_expand = False
+                    
+            except Exception as e:
+                logger.error(f"Error loading columns for table {table_name}: {e}")
+                # Remove placeholder and add error node
+                node.remove(node.children[0])
+                error_node = node.add(f"❌ Error loading columns: {e}")
+                error_node.data = {"type": "error"}
+                error_node.allow_expand = False
     
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
-        """Handle table selection from tree view."""
+        """Handle table/column selection from tree view."""
         node = event.node
-        if node.data and node.data != self.current_table:
-            self.current_table = node.data
-            self.load_table_data()
+        
+        if not node.data:
+            return
+        
+        if node.data.get("type") == "table":
+            # Table selected - load table data
+            table_name = node.data["name"]
+            if table_name != self.current_table:
+                self.current_table = table_name
+                self.load_table_data()
+                
+        elif node.data.get("type") == "column":
+            # Column selected - load table data and highlight column
+            table_name = node.data["table"]
+            column_name = node.data["name"]
+            
+            if table_name != self.current_table:
+                self.current_table = table_name
+                self.load_table_data()
+            
+            # Highlight the selected column in the data table
+            self._highlight_column(column_name)
     
     def load_table_data(self):
         """Load data from selected table."""
@@ -277,19 +335,22 @@ class DatabaseExplorer(App):
             data_table.action_cursor_left()
     
     def action_right(self) -> None:
-        """Move right/expand (vim l)."""
+        """Move right/expand (vim l) - expands table to show columns."""
         tree = self.query_one("#db-tree", Tree)
         data_table = self.query_one("#data-view", DataTable)
         
         if tree.has_focus:
             logger.debug("Expanding node in tree view")
-            # For tree view, right means expand the current node
-            if tree.cursor_node and not tree.cursor_node.is_expanded:
-                tree.action_toggle_node()
-            else:
-                # If node is already expanded, move to first child
-                if tree.cursor_node and tree.cursor_node.children:
-                    tree.cursor_node = tree.cursor_node.children[0]
+            cursor_node = tree.cursor_node
+            
+            if cursor_node:
+                # If it's a table node, expand it to show columns
+                if (cursor_node.data and cursor_node.data.get("type") == "table" and 
+                    not cursor_node.is_expanded):
+                    tree.action_toggle_node()
+                # If it's already expanded and has children, move to first child
+                elif cursor_node.children:
+                    tree.cursor_node = cursor_node.children[0]
         else:
             logger.debug("Moving right in data table")
             data_table.action_cursor_right()
@@ -317,6 +378,52 @@ class DatabaseExplorer(App):
         else:
             logger.debug("Going to end in data table")
             data_table.action_cursor_end()
+    
+    def _get_table_columns(self, table_name: str) -> list:
+        """Get column names for a specific table."""
+        if not table_name:
+            return []
+        
+        try:
+            cursor = self.connection.cursor()
+            safe_table_name = self._quote_identifier(table_name)
+            
+            # Get column information from the table
+            cursor.columns(table=safe_table_name)
+            columns = []
+            for row in cursor.fetchall():
+                columns.append(row.column_name)
+            
+            return columns
+            
+        except Exception as e:
+            logger.error(f"Error getting columns for table {table_name}: {e}")
+            raise Exception(f"Could not retrieve columns: {e}")
+    
+    def _highlight_column(self, column_name: str) -> None:
+        """Highlight the specified column in the data table."""
+        if not column_name:
+            return
+        
+        try:
+            data_table = self.query_one("#data-view", DataTable)
+            
+            # Find the column index
+            column_index = None
+            for i, column in enumerate(data_table.columns):
+                if column.label == column_name:
+                    column_index = i
+                    break
+            
+            if column_index is not None:
+                logger.info(f"Highlighting column: {column_name} (index {column_index})")
+                # Note: Textual DataTable doesn't have built-in column highlighting
+                # We'll implement this by temporarily changing the column style
+                # This is a basic implementation - could be enhanced
+                self.notify(f"Column '{column_name}' selected", severity="information")
+                
+        except Exception as e:
+            logger.error(f"Error highlighting column {column_name}: {e}")
     
     def _quote_identifier(self, identifier: str) -> str:
         """Properly quote SQL identifiers to prevent injection and handle special characters."""

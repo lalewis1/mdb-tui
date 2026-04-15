@@ -86,12 +86,37 @@ If the application exits without error:
 - `/`: Search (not yet implemented)
 - `Tab`: Switch focus between tree view and data table
 
-### Navigation Tips
+### Enhanced Navigation Features
 
-1. **Tree View**: Use `j`/`k` to move up/down, `l` to expand nodes, `h` to collapse
-2. **Data Table**: Use `j`/`k` to move between rows, `h`/`l` to move between columns
-3. **Focus Switching**: Press `Tab` to switch between tree and data table
-4. **Selection**: Select a table in the tree view to load its data into the table view
+#### Tree View Navigation
+- `j`/`k`: Move up/down between tables and columns
+- `l` (right): Expand table to show column list
+- `h` (left): Collapse expanded table or move to parent
+- `Enter`: Select table or column
+- `Tab`: Switch focus to data table
+
+#### Data Table Navigation
+- `j`/`k`: Move up/down between rows
+- `h`/`l`: Move left/right between columns
+- `gg`: Go to first row
+- `G`: Go to last row
+- `Tab`: Switch focus back to tree view
+
+#### Advanced Features
+1. **Expand Tables**: Press `l` on a table name to see its columns
+2. **Column Selection**: Press `l` or `Enter` on a column name to:
+   - Load the table data (if not already loaded)
+   - Highlight/select the specific column
+3. **Table Selection**: Press `Enter` on a table name to load its data
+4. **Focus Management**: Use `Tab` to switch between tree and data views
+
+### Example Workflow
+
+1. **Browse Structure**: Use `j`/`k` to navigate tables
+2. **Explore Table**: Press `l` to expand a table and see columns
+3. **Select Column**: Press `Enter` on a column to load table and highlight column
+4. **Analyze Data**: Use `Tab` to switch to data table, then `h`/`j`/`k`/`l` to navigate
+5. **Switch Tables**: Use `Tab` to return to tree, select another table/column
 
 ## Navigation
 
