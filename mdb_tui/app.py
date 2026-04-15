@@ -336,7 +336,7 @@ class DatabaseExplorer(App):
         """Write a message to the Textual Log widget."""
         try:
             log_widget = self.query_one("#debug-log", Log)
-            log_widget.write(f"[{level}] {message}")
+            log_widget.write(f"[{level}] {message}\n")
         except Exception:
             # Fallback to standard logging if Log widget not available
             if level == "INFO":
