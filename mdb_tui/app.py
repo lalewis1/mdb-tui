@@ -43,6 +43,28 @@ class DatabaseExplorer(App):
         self.current_data = []
         super().__init__()
     
+    CSS = """
+    #debug-log {
+        height: 3;
+        min-height: 3;
+        max-height: 3;
+    }
+    
+    #main-container {
+        height: 1fr;
+    }
+    
+    #tree-container {
+        width: 30%;
+        dock: left;
+    }
+    
+    #data-panel {
+        width: 70%;
+        dock: right;
+    }
+    """
+    
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header()
@@ -186,18 +208,18 @@ class DatabaseExplorer(App):
         """Handle table expansion to load columns."""
         node = event.node
         
-        logger.info(f"Node expanded: {node.label} (type: {node.data.get('type') if node.data else 'no data'})")
+        self._log_to_panel(f"Node expanded: {node.label} (type: {node.data.get('type') if node.data else 'no data'})")
         
         # Check if this is a table node being expanded
         if (node.data and node.data.get("type") == "table" and 
             node.children and node.children[0].data.get("type") == "placeholder"):
             
             table_name = node.data["name"]
-            logger.info(f"Loading columns for table: {table_name}")
+            self._log_to_panel(f"Loading columns for table: {table_name}")
             
             try:
                 columns = self._get_table_columns(table_name)
-                logger.info(f"Found {len(columns)} columns: {columns}")
+                self._log_to_panel(f"Found {len(columns)} columns: {columns}")
                 
                 # Remove the placeholder
                 placeholder = node.children[0]
@@ -212,10 +234,10 @@ class DatabaseExplorer(App):
                         "name": column
                     }
                     column_node.allow_expand = False
-                    logger.debug(f"Added column node: {column}")
+                    self._log_to_panel(f"Added column node: {column}", "DEBUG")
                     
             except Exception as e:
-                logger.error(f"Error loading columns for table {table_name}: {e}", exc_info=True)
+                self._log_to_panel(f"Error loading columns for table {table_name}: {e}", "ERROR")
                 # Remove placeholder and add error node
                 placeholder = node.children[0]
                 placeholder.remove()
@@ -223,7 +245,7 @@ class DatabaseExplorer(App):
                 error_node.data = {"type": "error"}
                 error_node.allow_expand = False
         else:
-            logger.info(f"Node not a table or already expanded: {node.label}")
+            self._log_to_panel(f"Node not a table or already expanded: {node.label}", "DEBUG")
     
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle table/column selection from tree view."""
