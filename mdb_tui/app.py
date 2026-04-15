@@ -335,18 +335,25 @@ class DatabaseExplorer(App):
     def _log_to_panel(self, message: str, level: str = "INFO") -> None:
         """Write a message to the Textual Log widget."""
         try:
-            log_widget = self.query_one("#debug-log", Log)
-            log_widget.write(f"[{level}] {message}\n")
+            # Use call_from_thread to ensure UI thread update
+            def update_log():
+                try:
+                    log_widget = self.query_one("#debug-log", Log)
+                    log_widget.write(f"[{level}] {message}\n")
+                except Exception:
+                    # Fallback if widget not available
+                    if level == "INFO":
+                        logger.info(message)
+                    elif level == "ERROR":
+                        logger.error(message)
+                    elif level == "DEBUG":
+                        logger.debug(message)
+                    elif level == "WARNING":
+                        logger.warning(message)
+            self.call_from_thread(update_log)
         except Exception:
-            # Fallback to standard logging if Log widget not available
-            if level == "INFO":
-                logger.info(message)
-            elif level == "ERROR":
-                logger.error(message)
-            elif level == "DEBUG":
-                logger.debug(message)
-            elif level == "WARNING":
-                logger.warning(message)
+            # If all else fails (should never reach here)
+            logger.error(f"Failed to log to panel: {message}")
     
     def action_return_to_tree(self) -> None:
         """Return focus to tree view (Escape key)."""
@@ -412,7 +419,12 @@ class DatabaseExplorer(App):
                     tree.action_toggle_node()
                 # For root node or if it's already a table node, just expand/collapse
                 elif cursor_node == tree.root:
-                    pass  # Do nothing for root node with 'l'
+                    # If root is not expanded, expand it; else move cursor to first child if it exists
+                    if not cursor_node.is_expanded:
+                        tree.action_toggle_node()
+                    elif cursor_node.children:
+                        tree.cursor_line = 1  # Move to first child (root is line 0)
+                        tree.refresh()
                 elif cursor_node.children:
                     tree.action_cursor_right()
         else:
@@ -452,15 +464,12 @@ class DatabaseExplorer(App):
         try:
             logger.info(f"Getting columns for table: {table_name}")
             cursor = self.connection.cursor()
-            safe_table_name = self._quote_identifier(table_name)
-            logger.info(f"Using safe table name: {safe_table_name}")
-            
-            # Get column information from the table
-            cursor.columns(table=safe_table_name)
+            # Pass the raw table name, not quoted, for pyodbc.columns()
+            logger.info(f"Using raw table name for .columns(): {table_name}")
+            cursor.columns(table=table_name)
             columns = []
             for row in cursor.fetchall():
                 columns.append(row.column_name)
-            
             logger.info(f"Successfully retrieved {len(columns)} columns: {columns}")
             return columns
             
@@ -520,7 +529,13 @@ class DatabaseExplorer(App):
             try:
                 data_table = self.query_one("#data-view", DataTable)
                 for i, col in enumerate(data_table.columns):
-                    if col.label == column_name:
+                    # Compare after stripping emoji/prefix and whitespace from both sides
+                    label_clean = col.label.strip()
+                    target_clean = column_name.strip()
+                    # Remove icons, like '📋', if present
+                    if label_clean.startswith("📋"):
+                        label_clean = label_clean.lstrip("📋 ").strip()
+                    if label_clean == target_clean:
                         col_index = i
                         break
             except Exception as e:
