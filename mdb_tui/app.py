@@ -281,7 +281,7 @@ class DatabaseExplorer(App):
             # Focus on data table and clear column summary
             self._focus_data_table()
             summary_label = self.query_one("#column-summary", Label)
-            summary_label.update("Select a table or column to see details")
+            summary_label.update("")
 
         elif node.data.get("type") == "column":
             # Column selected - load table data and highlight column
@@ -296,7 +296,7 @@ class DatabaseExplorer(App):
             self._focus_data_table()
             self._highlight_column(column_name)
             summary_label = self.query_one("#column-summary", Label)
-            summary_label.update("Select a table or column to see details")
+            summary_label.update("")
 
     def load_table_data(self):
         """Load data from selected table."""
@@ -562,7 +562,7 @@ class DatabaseExplorer(App):
                 pass
         if not column_name or not table_name or not self.current_data:
             summary_label = self.query_one("#column-summary", Label)
-            summary_label.update("No column selected for stats.")
+            summary_label.update("")
             return
         # Calculate stats as before
         stats, stat_sql, columns_sql = self._get_column_statistics_sql(column_name, table_name)
@@ -640,10 +640,16 @@ class DatabaseExplorer(App):
         return stats, stat_sql, columns_sql
 
 
-    def _get_column_statistics(self, column_name: str) -> dict:
-        """Calculate statistics for a specific column."""
-        if not self.current_data or not column_name:
-            return {
+    def on_key(self, event):
+        from textual.events import Key
+        if isinstance(event, Key):
+            if event.key == "s":
+                # Always trigger stats for the current selection
+                self.action_show_stats()
+                event.stop()
+                return
+        super().on_key(event)
+
                 "row_count": 0,
                 "null_count": 0,
                 "distinct_count": 0,
