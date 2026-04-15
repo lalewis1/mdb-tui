@@ -397,8 +397,12 @@ class DatabaseExplorer(App):
             if cursor_node and cursor_node.is_expanded:
                 tree.action_toggle_node()
             elif cursor_node and cursor_node != tree.root:
-                # Only try to move left if not on root node
-                tree.action_cursor_left()
+                # Only try to move left if not on root node and there is a parent
+                if getattr(cursor_node, "parent", None) and cursor_node.parent != tree.root:
+                    tree.action_cursor_left()
+                else:
+                    logger.debug("No-op: 'h' pressed on node without parent (table or column)")
+                    pass  # No operation if can't move left beyond this node
         else:
             logger.debug("Moving left in data table")
             data_table.action_cursor_left()
