@@ -340,6 +340,18 @@ class DatabaseExplorer(App):
                         self.tree_manager.tree.refresh()
                 elif cursor_node.children:
                     self.tree_manager.tree.action_cursor_right()
+                # If it's a column node, focus the table view and select that column
+                elif cursor_node.data and cursor_node.data.get("type") == "column":
+                    table_name = cursor_node.data["table"]
+                    column_name = cursor_node.data["name"]
+                    
+                    # Load the table data if not already loaded
+                    if table_name != (self.data_manager.current_table if self.data_manager else None):
+                        self.data_manager.load_table_data(table_name)
+                    
+                    # Focus the data table and highlight the column
+                    self.data_manager.focus()
+                    self.data_manager.highlight_column(column_name)
         elif self.data_manager and self.data_manager.table:
             logger.debug("Moving right in data table")
             self.data_manager.table.action_cursor_right()
