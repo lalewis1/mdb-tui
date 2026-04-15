@@ -62,7 +62,7 @@ class DatabaseExplorer(App):
             ),
             id="main-container"
         )
-        yield Log(id="debug-log")
+        yield Log(id="debug-log", max_lines=3, height=3)
         yield Footer()
     
     def on_mount(self) -> None:
@@ -80,10 +80,19 @@ class DatabaseExplorer(App):
             
             self.connect_to_database()
             self.load_database_structure()
+            
+            # Debug: log the tables we found
+            logger.info(f"Found {len(self.tables)} tables: {self.tables}")
+            
             self.update_tree_view()
             
-            # Set initial focus to tree view
+            # Debug: check tree structure
             tree = self.query_one("#db-tree", Tree)
+            logger.info(f"Tree root has {len(tree.root.children)} children")
+            for i, child in enumerate(tree.root.children):
+                logger.info(f"  Child {i}: {child.label} (data: {child.data})")
+            
+            # Set initial focus to tree view
             tree.focus()
             logger.info("Set initial focus to tree view")
             
@@ -363,8 +372,10 @@ class DatabaseExplorer(App):
                 if (cursor_node.data and cursor_node.data.get("type") == "table" and 
                     not cursor_node.is_expanded):
                     tree.action_toggle_node()
-                # Don't try action_cursor_right on root node or if no children
-                elif cursor_node.children and cursor_node != tree.root:
+                # For root node or if it's already a table node, just expand/collapse
+                elif cursor_node == tree.root:
+                    pass  # Do nothing for root node with 'l'
+                elif cursor_node.children:
                     tree.action_cursor_right()
         else:
             logger.debug("Moving right in data table")
@@ -397,11 +408,14 @@ class DatabaseExplorer(App):
     def _get_table_columns(self, table_name: str) -> list:
         """Get column names for a specific table."""
         if not table_name:
+            logger.warning("Empty table name provided to _get_table_columns")
             return []
         
         try:
+            logger.info(f"Getting columns for table: {table_name}")
             cursor = self.connection.cursor()
             safe_table_name = self._quote_identifier(table_name)
+            logger.info(f"Using safe table name: {safe_table_name}")
             
             # Get column information from the table
             cursor.columns(table=safe_table_name)
@@ -409,10 +423,11 @@ class DatabaseExplorer(App):
             for row in cursor.fetchall():
                 columns.append(row.column_name)
             
+            logger.info(f"Successfully retrieved {len(columns)} columns: {columns}")
             return columns
             
         except Exception as e:
-            logger.error(f"Error getting columns for table {table_name}: {e}")
+            logger.error(f"Error getting columns for table {table_name}: {e}", exc_info=True)
             raise Exception(f"Could not retrieve columns: {e}")
     
     def _focus_data_table(self) -> None:
