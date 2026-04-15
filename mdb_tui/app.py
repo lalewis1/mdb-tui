@@ -72,6 +72,7 @@ class DatabaseExplorer(App):
             Container(
                 Label("Database Explorer", id="title"),
                 Tree("Database Structure", id="db-tree"),
+                Label("Select a table or column to see details", id="column-summary"),
                 id="tree-container"
             ),
             Container(
@@ -79,7 +80,7 @@ class DatabaseExplorer(App):
                     DataTable(id="data-view"),
                     id="data-container"
                 ),
-                Label("Select a table or column to see details", id="column-summary"),
+                Label("", id="sql-panel"),
                 id="data-panel"
             ),
             id="main-container"
@@ -287,26 +288,32 @@ class DatabaseExplorer(App):
         try:
             logger.info(f"Loading data from table: {self.current_table}")
             cursor = self.connection.cursor()
-            
             # Properly quote the table name to prevent SQL injection
             # For Access, we use square brackets for quoting
             safe_table_name = self._quote_identifier(self.current_table)
             logger.debug(f"Using safe table name: {safe_table_name}")
-            
+            # Prepare SQL query
+            sql = None
             # Try TOP 100 for Access, fallback to LIMIT 100 for other databases
             try:
-                cursor.execute(f"SELECT TOP 100 * FROM {safe_table_name}")
+                sql = f"SELECT TOP 100 * FROM {safe_table_name}"
+                cursor.execute(sql)
             except pyodbc.Error:
-                cursor.execute(f"SELECT * FROM {safe_table_name} LIMIT 100")
-            
-            # Get column names
+                sql = f"SELECT * FROM {safe_table_name} LIMIT 100"
+                cursor.execute(sql)
+            # Show the SQL in the panel
+            try:
+                sql_panel = self.query_one("#sql-panel", Label)
+                sql_panel.update(f"SQL: {sql}")
+            except Exception as e:
+                logger.debug(f"Failed to update SQL panel: {e}")
+            # Get column names exactly as returned by DB
             columns = [column[0] for column in cursor.description]
-            logger.debug(f"Columns: {columns}")
-            
+            logger.debug(f"DB columns: {columns}")
+            self._log_to_panel(f"Loaded table columns: {columns}", "DEBUG")
             # Get data
             self.current_data = cursor.fetchall()
             logger.info(f"Loaded {len(self.current_data)} rows from {self.current_table}")
-            
             # Update data table
             self.update_data_table(columns)
         except Exception as e:
