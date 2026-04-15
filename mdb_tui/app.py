@@ -31,7 +31,7 @@ class DatabaseExplorer(App):
         Binding("gg", "home", "Home", show=False),
         Binding("G", "end", "End", show=False),
         Binding("/", "search", "Search", show=False),
-        Binding("escape", "return_to_tree", "Return to Tree", show=False),
+        Binding("s", "show_stats", "Show Stats", show=True),
     ]
 
     def __init__(self, db_path: str):
@@ -277,9 +277,10 @@ class DatabaseExplorer(App):
                 self.current_table = table_name
                 self.load_table_data()
 
-            # Focus on data table and update column summary
+            # Focus on data table and clear column summary
             self._focus_data_table()
-            self._update_column_summary(None)  # Clear column-specific info
+            summary_label = self.query_one("#column-summary", Label)
+            summary_label.update("Select a table or column to see details")
 
         elif node.data.get("type") == "column":
             # Column selected - load table data and highlight column
@@ -290,10 +291,11 @@ class DatabaseExplorer(App):
                 self.current_table = table_name
                 self.load_table_data()
 
-            # Focus on data table, highlight column, and update summary
+            # Focus on data table and highlight column, but do not update stats
             self._focus_data_table()
             self._highlight_column(column_name)
-            self._update_column_summary(column_name)
+            summary_label = self.query_one("#column-summary", Label)
+            summary_label.update("Select a table or column to see details")
 
     def load_table_data(self):
         """Load data from selected table."""
@@ -535,32 +537,106 @@ class DatabaseExplorer(App):
         except Exception as e:
             logger.error(f"Error focusing data table: {e}")
 
-    def _update_column_summary(self, column_name: str = None) -> None:
-        """Update the column summary panel with statistics."""
+    def action_show_stats(self) -> None:
+        """Show statistics for the current column (via key 's')."""
+        # Try to get currently selected column, first from the tree view, then from data table
+        column_name = None
+        table_name = self.current_table
         try:
+            # Try tree selection first
+            tree = self.query_one("#db-tree", Tree)
+            node = tree.cursor_node
+            if node and node.data and node.data.get("type") == "column":
+                column_name = node.data["name"]
+                table_name = node.data["table"]
+        except Exception:
+            pass
+        # If not found, try the focused data table column
+        if not column_name:
+            try:
+                data_table = self.query_one("#data-view", DataTable)
+                if data_table.cursor_column is not None:
+                    column_name = data_table.columns[data_table.cursor_column].label
+            except Exception:
+                pass
+        if not column_name or not table_name or not self.current_data:
             summary_label = self.query_one("#column-summary", Label)
+            summary_label.update("No column selected for stats.")
+            return
+        # Calculate stats as before
+        stats, stat_sql, columns_sql = self._get_column_statistics_sql(column_name, table_name)
+        # Update summary
+        summary_label = self.query_one("#column-summary", Label)
+        summary_text = f"📊 Column: {column_name}\n"
+        summary_text += f"📋 Table: {table_name}\n"
+        summary_text += f"📈 Rows: {stats['row_count']}\n"
+        summary_text += f"🔢 Nulls: {stats['null_count']}\n"
+        summary_text += f"🔡 Distinct: {stats['distinct_count']}\n"
+        summary_text += f"🏷️ Type: {stats['data_type']}"
+        summary_label.update(summary_text)
+        # Update the SQL panel to show *both* queries
+        sql_panel = self.query_one("#sql-panel", Label)
+        sql_panel.update(f"Stats SQL: {stat_sql}\nColumns SQL: {columns_sql}")
 
-            if not column_name or not self.current_table or not self.current_data:
-                summary_label.update("Select a table or column to see details")
-                return
-
-            # Get column statistics
-            stats = self._get_column_statistics(column_name)
-
-            summary_text = f"📊 Column: {column_name}\n"
-            summary_text += f"📋 Table: {self.current_table}\n"
-            summary_text += f"📈 Rows: {stats['row_count']}\n"
-            summary_text += f"🔢 Nulls: {stats['null_count']}\n"
-            summary_text += f"🔡 Distinct: {stats['distinct_count']}\n"
-            summary_text += f"🏷️ Type: {stats['data_type']}"
-
-            summary_label.update(summary_text)
-            logger.debug(f"Updated column summary for {column_name}")
-
+    def _get_column_statistics_sql(self, column_name: str, table_name: str):
+        # Helper to return stats, stat SQL, and column list SQL
+        stats = {
+            'row_count': 0,
+            'null_count': 0,
+            'distinct_count': 0,
+            'data_type': 'unknown'
+        }
+        stat_sql = columns_sql = ""
+        try:
+            # Columns SQL for pyodbc would be the ODBC columns() call, but simulate as actual SQL
+            columns_sql = f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{table_name}'"
+            # Data type stats SQL for demonstration (pyodbc gets all rows, so emulate basic stats)
+            safe_table = self._quote_identifier(table_name)
+            safe_column = self._quote_identifier(column_name)
+            stat_sql = (
+                f"SELECT COUNT(*) as row_count, "
+                f"SUM(IIF({safe_column} IS NULL OR {safe_column}='',1,0)) as null_count, "
+                f"COUNT(DISTINCT {safe_column}) as distinct_count "
+                f"FROM {safe_table}"
+            )
+            # Actually run the stats in Python for now (mimic result as SQL would)
+            col_index = None
+            data_table = self.query_one("#data-view", DataTable)
+            for i, col in enumerate(data_table.columns):
+                clean = col.label.strip()
+                if clean.startswith("📋"):
+                    clean = clean.lstrip("📋 ").strip()
+                if clean == column_name.strip():
+                    col_index = i
+                    break
+            if col_index is not None:
+                values = []
+                null_count = 0
+                for row in self.current_data:
+                    value = row[col_index]
+                    if value is None or str(value).strip() == "":
+                        null_count += 1
+                    else:
+                        values.append(value)
+                data_type = "text"
+                if values:
+                    first_val = values[0]
+                    if isinstance(first_val, (int, float)):
+                        data_type = "number"
+                    elif isinstance(first_val, bool):
+                        data_type = "boolean"
+                    elif hasattr(first_val, "__class__") and "date" in str(first_val.__class__).lower():
+                        data_type = "date"
+                stats = {
+                    'row_count': len(self.current_data),
+                    'null_count': null_count,
+                    'distinct_count': len(set(str(v) for v in values)),
+                    'data_type': data_type
+                }
         except Exception as e:
-            logger.error(f"Error updating column summary: {e}")
-            summary_label = self.query_one("#column-summary", Label)
-            summary_label.update(f"Error: {e}")
+            logger.error(f"Error calculating column stats with SQL: {e}")
+        return stats, stat_sql, columns_sql
+
 
     def _get_column_statistics(self, column_name: str) -> dict:
         """Calculate statistics for a specific column."""
