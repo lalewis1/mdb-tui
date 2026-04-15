@@ -59,7 +59,7 @@ class DatabaseExplorer(App):
     }
 
     DataTable.unfocused-datatable {
-        background: $surface-dark 80%;
+        background: $surface-darken-3 80%;
         color: $text 40%;
         opacity: 0.65;
         transition: opacity 0.15s;
