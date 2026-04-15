@@ -224,10 +224,15 @@ class DatabaseExplorer(App):
             self.notify(f"Error calculating stats: {e}", severity="error")
 
     def action_quit(self) -> None:
-        """Quit the application."""
-        if self.db_manager:
-            self.db_manager.close()
-        self.app.exit()
+        """Quit the application or return to tree view."""
+        if self.tree_manager and self.tree_manager.tree and self.tree_manager.tree.has_focus:
+            # If tree has focus, quit the application
+            if self.db_manager:
+                self.db_manager.close()
+            self.app.exit()
+        else:
+            # If data table has focus, return to tree view
+            self.action_return_to_tree()
 
     def _log_to_panel(self, message: str, level: str = "INFO") -> None:
         """Write a message to the Textual Log widget."""
