@@ -1,7 +1,6 @@
 """Main TUI application for exploring Access databases."""
 
 import pyodbc
-import logging
 import sys
 import os
 from textual.app import App, ComposeResult
@@ -9,7 +8,8 @@ from textual.containers import Container, ScrollableContainer
 from textual.widgets import Header, Footer, Tree, DataTable, Input, Label, Log
 from textual.binding import Binding
 
-# Configure logging - we'll let Textual handle the logging display
+# Simple logging to file (Textual Log widget will handle display)
+import logging
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -62,15 +62,15 @@ class DatabaseExplorer(App):
             ),
             id="main-container"
         )
-        yield Log(id="debug-log", max_lines=3, height=3)
+        yield Log(id="debug-log", max_lines=3)
         yield Footer()
     
     def on_mount(self) -> None:
         """Connect to database and load structure when app starts."""
         try:
-            logger.info(f"Starting mdb-tui with database: {self.db_path}")
-            logger.info(f"Current working directory: {os.getcwd()}")
-            logger.info(f"Database file exists: {os.path.exists(self.db_path)}")
+            self._log_to_panel(f"Starting mdb-tui with database: {self.db_path}")
+            self._log_to_panel(f"Current working directory: {os.getcwd()}")
+            self._log_to_panel(f"Database file exists: {os.path.exists(self.db_path)}")
             
             # Check for .accdb files with 32-bit Python
             is_32bit = sys.maxsize <= 2**32
@@ -82,15 +82,15 @@ class DatabaseExplorer(App):
             self.load_database_structure()
             
             # Debug: log the tables we found
-            logger.info(f"Found {len(self.tables)} tables: {self.tables}")
+            self._log_to_panel(f"Found {len(self.tables)} tables: {self.tables}")
             
             self.update_tree_view()
             
             # Debug: check tree structure
             tree = self.query_one("#db-tree", Tree)
-            logger.info(f"Tree root has {len(tree.root.children)} children")
+            self._log_to_panel(f"Tree root has {len(tree.root.children)} children")
             for i, child in enumerate(tree.root.children):
-                logger.info(f"  Child {i}: {child.label} (data: {child.data})")
+                self._log_to_panel(f"  Child {i}: {child.label} (data: {child.data})")
             
             # Set initial focus to tree view
             tree.focus()
@@ -309,6 +309,22 @@ class DatabaseExplorer(App):
         if self.connection:
             self.connection.close()
         self.app.exit()
+    
+    def _log_to_panel(self, message: str, level: str = "INFO") -> None:
+        """Write a message to the Textual Log widget."""
+        try:
+            log_widget = self.query_one("#debug-log", Log)
+            log_widget.write(f"[{level}] {message}")
+        except Exception:
+            # Fallback to standard logging if Log widget not available
+            if level == "INFO":
+                logger.info(message)
+            elif level == "ERROR":
+                logger.error(message)
+            elif level == "DEBUG":
+                logger.debug(message)
+            elif level == "WARNING":
+                logger.warning(message)
     
     def action_return_to_tree(self) -> None:
         """Return focus to tree view (Escape key)."""
