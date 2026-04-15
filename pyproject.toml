@@ -1,0 +1,10 @@
+[project]
+name = "mdb-tui"
+version = "0.1.0"
+description = "A TUI for exploring Access databases"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "textual==0.60.0",
+    "pyodbc==5.1.0",
+]
