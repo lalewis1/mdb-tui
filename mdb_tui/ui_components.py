@@ -161,20 +161,26 @@ class DataTableManager:
             return
 
         try:
+            # Strip the 📋 prefix if present (from tree view)
+            clean_column_name = column_name.strip().lstrip("📋").strip()
+
             # Find column index
             column_index = None
             for i, column in enumerate(self.table.columns):
-                if column.label == column_name:
+                if column.label == clean_column_name:
                     column_index = i
                     break
 
             if column_index is not None:
                 logger.info(
-                    f"Highlighting column: {column_name} (index {column_index})"
+                    f"Highlighting column: {clean_column_name} (index {column_index})"
                 )
                 self.app.notify(
-                    f"Column '{column_name}' selected", severity="information"
+                    f"Column '{clean_column_name}' selected", severity="information"
                 )
+                # Scroll to make the column visible
+                if hasattr(self.table, 'cursor_column'):
+                    self.table.cursor_column = column_index
 
         except Exception as e:
             logger.error(f"Error highlighting column {column_name}: {e}")

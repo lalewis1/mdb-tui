@@ -351,7 +351,9 @@ class DatabaseExplorer(App):
                     
                     # Focus the data table and highlight the column
                     self.data_manager.focus()
-                    self.data_manager.highlight_column(column_name)
+                    # Use the clean column name (without 📋 prefix)
+                    clean_column_name = column_name.strip().lstrip("📋").strip()
+                    self.data_manager.highlight_column(clean_column_name)
         elif self.data_manager and self.data_manager.table:
             logger.debug("Moving right in data table")
             self.data_manager.table.action_cursor_right()

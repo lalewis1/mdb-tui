@@ -154,8 +154,8 @@ class DatabaseManager:
             )
             cursor.execute(sql)
             result = cursor.fetchone()
-            row_count = result.row_count if result else 0
-            null_count = result.null_count if result else 0
+            row_count = int(result.row_count) if result and result.row_count is not None else 0
+            null_count = int(result.null_count) if result and result.null_count is not None else 0
 
             # Count distinct values
             distinct_sql = (
@@ -165,13 +165,13 @@ class DatabaseManager:
             )
             cursor.execute(distinct_sql)
             distinct_result = cursor.fetchone()
-            distinct_count = distinct_result.distinct_count if distinct_result else 0
+            distinct_count = int(distinct_result.distinct_count) if distinct_result and distinct_result.distinct_count is not None else 0
 
             return {
                 "row_count": row_count,
                 "null_count": null_count,
                 "distinct_count": distinct_count,
-                "data_type": column_info.data_type if column_info else "unknown",
+                "data_type": str(column_info.data_type) if column_info else "unknown",
                 "stats_sql": sql,
                 "distinct_sql": distinct_sql,
             }
