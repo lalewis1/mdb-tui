@@ -33,7 +33,7 @@ class DatabaseExplorer(App):
         Binding("gg", "home", "Home", show=False),
         Binding("G", "end", "End", show=False),
         Binding("/", "search", "Search", show=False),
-        Binding("tab", "switch_focus", "Switch Focus", show=False),
+        Binding("escape", "return_to_tree", "Return to Tree", show=False),
     ]
     
     def __init__(self, db_path: str):
@@ -48,11 +48,18 @@ class DatabaseExplorer(App):
         """Create child widgets for the app."""
         yield Header()
         yield Container(
-            Label("Database Explorer", id="title"),
-            Tree("Database Structure", id="db-tree"),
-            ScrollableContainer(
-                DataTable(id="data-view"),
-                id="data-container"
+            Container(
+                Label("Database Explorer", id="title"),
+                Tree("Database Structure", id="db-tree"),
+                id="tree-container"
+            ),
+            Container(
+                ScrollableContainer(
+                    DataTable(id="data-view"),
+                    id="data-container"
+                ),
+                Label("Select a table or column to see details", id="column-summary"),
+                id="data-panel"
             ),
             id="main-container"
         )
@@ -216,6 +223,10 @@ class DatabaseExplorer(App):
             if table_name != self.current_table:
                 self.current_table = table_name
                 self.load_table_data()
+            
+            # Focus on data table and update column summary
+            self._focus_data_table()
+            self._update_column_summary(None)  # Clear column-specific info
                 
         elif node.data.get("type") == "column":
             # Column selected - load table data and highlight column
@@ -226,8 +237,10 @@ class DatabaseExplorer(App):
                 self.current_table = table_name
                 self.load_table_data()
             
-            # Highlight the selected column in the data table
+            # Focus on data table, highlight column, and update summary
+            self._focus_data_table()
             self._highlight_column(column_name)
+            self._update_column_summary(column_name)
     
     def load_table_data(self):
         """Load data from selected table."""
@@ -282,17 +295,11 @@ class DatabaseExplorer(App):
             self.connection.close()
         self.app.exit()
     
-    def action_switch_focus(self) -> None:
-        """Switch focus between tree view and data table."""
+    def action_return_to_tree(self) -> None:
+        """Return focus to tree view (Escape key)."""
+        logger.debug("Returning focus to tree view")
         tree = self.query_one("#db-tree", Tree)
-        data_table = self.query_one("#data-view", DataTable)
-        
-        if tree.has_focus:
-            logger.debug("Switching focus from tree to data table")
-            data_table.focus()
-        else:
-            logger.debug("Switching focus from data table to tree")
-            tree.focus()
+        tree.focus()
     
     def action_down(self) -> None:
         """Move down (vim j)."""
@@ -348,8 +355,8 @@ class DatabaseExplorer(App):
                 if (cursor_node.data and cursor_node.data.get("type") == "table" and 
                     not cursor_node.is_expanded):
                     tree.action_toggle_node()
-                else:
-                    # Otherwise use default right behavior (move to child or right)
+                # Don't try action_cursor_right on root node or if no children
+                elif cursor_node.children and cursor_node != tree.root:
                     tree.action_cursor_right()
         else:
             logger.debug("Moving right in data table")
@@ -399,6 +406,113 @@ class DatabaseExplorer(App):
         except Exception as e:
             logger.error(f"Error getting columns for table {table_name}: {e}")
             raise Exception(f"Could not retrieve columns: {e}")
+    
+    def _focus_data_table(self) -> None:
+        """Focus on the data table view."""
+        try:
+            data_table = self.query_one("#data-view", DataTable)
+            data_table.focus()
+            logger.debug("Focus set to data table")
+        except Exception as e:
+            logger.error(f"Error focusing data table: {e}")
+    
+    def _update_column_summary(self, column_name: str = None) -> None:
+        """Update the column summary panel with statistics."""
+        try:
+            summary_label = self.query_one("#column-summary", Label)
+            
+            if not column_name or not self.current_table or not self.current_data:
+                summary_label.update("Select a table or column to see details")
+                return
+            
+            # Get column statistics
+            stats = self._get_column_statistics(column_name)
+            
+            summary_text = f"📊 Column: {column_name}\n"
+            summary_text += f"📋 Table: {self.current_table}\n"
+            summary_text += f"📈 Rows: {stats['row_count']}\n"
+            summary_text += f"🔢 Nulls: {stats['null_count']}\n"
+            summary_text += f"🔡 Distinct: {stats['distinct_count']}\n"
+            summary_text += f"🏷️ Type: {stats['data_type']}"
+            
+            summary_label.update(summary_text)
+            logger.debug(f"Updated column summary for {column_name}")
+            
+        except Exception as e:
+            logger.error(f"Error updating column summary: {e}")
+            summary_label = self.query_one("#column-summary", Label)
+            summary_label.update(f"Error: {e}")
+    
+    def _get_column_statistics(self, column_name: str) -> dict:
+        """Calculate statistics for a specific column."""
+        if not self.current_data or not column_name:
+            return {
+                'row_count': 0,
+                'null_count': 0,
+                'distinct_count': 0,
+                'data_type': 'unknown'
+            }
+        
+        try:
+            # Get column index from the data table
+            col_index = None
+            try:
+                data_table = self.query_one("#data-view", DataTable)
+                for i, col in enumerate(data_table.columns):
+                    if col.label == column_name:
+                        col_index = i
+                        break
+            except Exception as e:
+                logger.debug(f"Could not get column index from DataTable: {e}")
+                # Fallback: try to find column by name in the first row (if it exists)
+                if self.current_data and len(self.current_data) > 0:
+                    first_row = self.current_data[0]
+                    for i, value in enumerate(first_row):
+                        if str(value) == column_name:
+                            col_index = i
+                            break
+            
+            if col_index is None:
+                logger.warning(f"Could not find column '{column_name}' in data")
+                return {'row_count': 0, 'null_count': 0, 'distinct_count': 0, 'data_type': 'unknown'}
+            
+            # Calculate statistics
+            values = []
+            null_count = 0
+            
+            for row in self.current_data:
+                value = row[col_index]
+                if value is None or str(value).strip() == '':
+                    null_count += 1
+                else:
+                    values.append(value)
+            
+            # Determine data type
+            data_type = 'text'
+            if values:
+                first_val = values[0]
+                if isinstance(first_val, (int, float)):
+                    data_type = 'number'
+                elif isinstance(first_val, bool):
+                    data_type = 'boolean'
+                elif hasattr(first_val, '__class__') and 'date' in str(first_val.__class__).lower():
+                    data_type = 'date'
+            
+            return {
+                'row_count': len(self.current_data),
+                'null_count': null_count,
+                'distinct_count': len(set(str(v) for v in values)),
+                'data_type': data_type
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating column statistics: {e}")
+            return {
+                'row_count': len(self.current_data) if self.current_data else 0,
+                'null_count': 'N/A',
+                'distinct_count': 'N/A',
+                'data_type': 'unknown'
+            }
     
     def _highlight_column(self, column_name: str) -> None:
         """Highlight the specified column in the data table."""

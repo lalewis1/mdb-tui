@@ -84,7 +84,30 @@ If the application exits without error:
 - `gg`: Go to top (home)
 - `G`: Go to bottom (end)
 - `/`: Search (not yet implemented)
-- `Tab`: Switch focus between tree view and data table
+- `Enter`: Select table/column and focus data table
+- `Escape`: Return focus to tree view
+
+## Navigation Workflow
+
+1. **Browse Tables**: Use `j`/`k` to navigate tables in tree view
+2. **Expand Table**: Press `l` on a table to see its columns
+3. **Select Table/Column**: Press `Enter` on table or column to:
+   - Load table data into data table
+   - Focus on data table automatically
+   - Show column statistics in summary panel (for columns)
+4. **Analyze Data**: Use `h`/`j`/`k`/`l` to navigate data
+5. **Return to Tree**: Press `Escape` to return focus to tree view
+6. **Select Different Table**: Repeat from step 1
+
+## Column Summary Panel
+
+When you select a column, the right panel shows:
+- **📊 Column**: Column name
+- **📋 Table**: Table name
+- **📈 Rows**: Total rows in table
+- **🔢 Nulls**: Count of null/empty values
+- **🔡 Distinct**: Count of distinct values
+- **🏷️ Type**: Data type (text, number, boolean, date)
 
 ### Enhanced Navigation Features
 
