@@ -33,6 +33,7 @@ class DatabaseExplorer(App):
         Binding("gg", "home", "Home", show=False),
         Binding("G", "end", "End", show=False),
         Binding("/", "search", "Search", show=False),
+        Binding("tab", "switch_focus", "Switch Focus", show=False),
     ]
     
     def __init__(self, db_path: str):
@@ -73,6 +74,12 @@ class DatabaseExplorer(App):
             self.connect_to_database()
             self.load_database_structure()
             self.update_tree_view()
+            
+            # Set initial focus to tree view
+            tree = self.query_one("#db-tree", Tree)
+            tree.focus()
+            logger.info("Set initial focus to tree view")
+            
             logger.info("Database connection and structure loading successful")
         except Exception as e:
             logger.error(f"Error connecting to database: {e}", exc_info=True)
@@ -210,35 +217,89 @@ class DatabaseExplorer(App):
             self.connection.close()
         self.app.exit()
     
+    def action_switch_focus(self) -> None:
+        """Switch focus between tree view and data table."""
+        tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
+        if tree.has_focus:
+            logger.debug("Switching focus from tree to data table")
+            data_table.focus()
+        else:
+            logger.debug("Switching focus from data table to tree")
+            tree.focus()
+    
     def action_down(self) -> None:
         """Move down (vim j)."""
         tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
         if tree.has_focus:
+            logger.debug("Moving down in tree view")
             tree.action_cursor_down()
         else:
-            data_table = self.query_one("#data-view", DataTable)
+            logger.debug("Moving down in data table")
             data_table.action_cursor_down()
     
     def action_up(self) -> None:
         """Move up (vim k)."""
         tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
         if tree.has_focus:
+            logger.debug("Moving up in tree view")
             tree.action_cursor_up()
         else:
-            data_table = self.query_one("#data-view", DataTable)
+            logger.debug("Moving up in data table")
             data_table.action_cursor_up()
     
     def action_left(self) -> None:
         """Move left (vim h)."""
         tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
         if tree.has_focus:
+            logger.debug("Moving left in tree view")
             tree.action_cursor_left()
+        else:
+            logger.debug("Moving left in data table")
+            data_table.action_cursor_left()
     
     def action_right(self) -> None:
         """Move right (vim l)."""
         tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
         if tree.has_focus:
+            logger.debug("Moving right in tree view")
             tree.action_cursor_right()
+        else:
+            logger.debug("Moving right in data table")
+            data_table.action_cursor_right()
+    
+    def action_home(self) -> None:
+        """Go to home (vim gg)."""
+        tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
+        if tree.has_focus:
+            logger.debug("Going to home in tree view")
+            tree.action_cursor_home()
+        else:
+            logger.debug("Going to home in data table")
+            data_table.action_cursor_home()
+    
+    def action_end(self) -> None:
+        """Go to end (vim G)."""
+        tree = self.query_one("#db-tree", Tree)
+        data_table = self.query_one("#data-view", DataTable)
+        
+        if tree.has_focus:
+            logger.debug("Going to end in tree view")
+            tree.action_cursor_end()
+        else:
+            logger.debug("Going to end in data table")
+            data_table.action_cursor_end()
 
 
 def main():

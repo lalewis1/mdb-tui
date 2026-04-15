@@ -79,11 +79,19 @@ If the application exits without error:
 - `q`: Quit the application
 - `j`: Move down (in tree or data view)
 - `k`: Move up (in tree or data view)
-- `h`: Move left/collapse (in tree view)
-- `l`: Move right/expand (in tree view)
-- `gg`: Go to top
-- `G`: Go to bottom
+- `h`: Move left/collapse (in tree view) or left (in data view)
+- `l`: Move right/expand (in tree view) or right (in data view)
+- `gg`: Go to top (home)
+- `G`: Go to bottom (end)
 - `/`: Search (not yet implemented)
+- `Tab`: Switch focus between tree view and data table
+
+### Navigation Tips
+
+1. **Tree View**: Use `j`/`k` to move up/down, `l` to expand nodes, `h` to collapse
+2. **Data Table**: Use `j`/`k` to move between rows, `h`/`l` to move between columns
+3. **Focus Switching**: Press `Tab` to switch between tree and data table
+4. **Selection**: Select a table in the tree view to load its data into the table view
 
 ## Navigation
 
