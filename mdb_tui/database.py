@@ -171,7 +171,7 @@ class DatabaseManager:
                 "row_count": row_count,
                 "null_count": null_count,
                 "distinct_count": distinct_count,
-                "data_type": str(column_info.data_type) if column_info else "unknown",
+                "data_type": str(column_info.type_name) if column_info else "unknown",
                 "stats_sql": sql,
                 "distinct_sql": distinct_sql,
             }
