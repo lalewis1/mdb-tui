@@ -64,7 +64,7 @@ class DatabaseManager:
                 "ODBC Driver 17 for SQL Server",
             ]
 
-    def get_tables(self) -> List[str]:
+    def get_tables(self) -> List[Dict[str, str]]:
         """Get list of tables and views from database."""
         if not self.connection:
             raise Exception("Database not connected")
@@ -73,11 +73,11 @@ class DatabaseManager:
 
         # Get tables
         cursor.tables(tableType="TABLE")
-        tables = [row.table_name for row in cursor.fetchall()]
+        tables = [{"name": row.table_name, "type": "TABLE"} for row in cursor.fetchall()]
 
         # Get views
         cursor.tables(tableType="VIEW")
-        views = [row.table_name for row in cursor.fetchall()]
+        views = [{"name": row.table_name, "type": "VIEW"} for row in cursor.fetchall()]
 
         return tables + views
 

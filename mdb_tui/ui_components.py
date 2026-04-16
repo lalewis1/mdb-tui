@@ -22,7 +22,7 @@ class DatabaseTreeManager:
         if not self.tree:
             raise Exception("Tree widget not found")
 
-    def update_tree(self, tables: List[str]) -> None:
+    def update_tree(self, tables: List[Dict[str, str]]) -> None:
         """Update tree with database structure."""
         self.tables = tables
         self.tree.clear()
@@ -31,9 +31,17 @@ class DatabaseTreeManager:
         root.label = self.app.db_path
         root.allow_expand = True
 
-        for table in tables:
-            table_node = root.add(table)
-            table_node.data = {"type": "table", "name": table}
+        for table_info in tables:
+            table_name = table_info["name"]
+            table_type = table_info.get("type", "TABLE")
+            
+            # Use different display for VIEW vs TABLE
+            display_name = table_name
+            if table_type == "VIEW":
+                display_name = f"👁️  {display_name}"
+            
+            table_node = root.add(display_name)
+            table_node.data = {"type": "table", "name": table_name, "table_type": table_type}
             table_node.allow_expand = True
 
             # Add placeholder child
