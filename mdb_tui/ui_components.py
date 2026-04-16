@@ -153,6 +153,10 @@ class DataTableManager:
         if not self.table:
             return
 
+        # Remove all columns to ensure clean state
+        for column in list(self.table.columns):
+            self.table.remove_column(column)
+        
         self.table.clear()
 
         # Add columns
