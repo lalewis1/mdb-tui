@@ -188,7 +188,7 @@ class DataTableManager:
                     f"Highlighting column: {clean_column_name} (index {column_index})"
                 )
                 self.app.notify(
-                    f"Column '{clean_column_name}' selected", severity="information"
+                    f"Column '{clean_column_name}' selected", severity="info"
                 )
                 # Scroll to make the column visible
                 if hasattr(self.table, 'cursor_column'):

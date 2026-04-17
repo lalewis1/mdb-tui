@@ -425,7 +425,13 @@ class DatabaseExplorer(App):
         nodes = self._find_all_tree_nodes()
         self.search_matches = []
         for node in nodes:
-            if term.lower() in node.label.lower():
+            # Handle both string labels and Text objects
+            label_text = node.label
+            if hasattr(label_text, 'plain'):
+                label_text = label_text.plain
+            elif not isinstance(label_text, str):
+                label_text = str(label_text)
+            if term.lower() in label_text.lower():
                 self.search_matches.append(node)
         self.current_match_index = 0 if self.search_matches else -1
         return self.search_matches
