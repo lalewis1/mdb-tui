@@ -29,7 +29,7 @@ class DatabaseManager:
                     if self.user:
                         connection_string += f"UID={self.user};"
                     if self.password:
-                        connection_string += f"PWD={self.password};"
+                        connection_string += f"PWD={{{self.password}}};"
                     connection_string += "ReadOnly=True;"
                     logger.info(f"Trying driver: {driver}")
                     self.connection = pyodbc.connect(connection_string)
