@@ -37,6 +37,8 @@ class DatabaseExplorer(App):
         Binding("gg", "home", "Home", show=False),
         Binding("G", "end", "End", show=False),
         Binding("/", "search", "Search", show=False),
+        Binding("n", "search_next", "Next Match", show=False),
+        Binding("N", "search_previous", "Previous Match", show=False),
         Binding("s", "show_stats", "Show Stats", show=True),
         Binding("escape", "return_to_tree", "Return to Tree", show=False),
     ]
@@ -48,6 +50,11 @@ class DatabaseExplorer(App):
         self.data_manager = None
         self.status_manager = None
         self.logger_manager = None
+        # Search state
+        self.search_mode = False
+        self.search_term = ""
+        self.search_matches = []
+        self.current_match_index = -1
         super().__init__()
 
     CSS = """
@@ -72,6 +79,21 @@ class DatabaseExplorer(App):
         opacity: 0.65;
         transition: opacity 0.15s;
     }
+
+    #search-prompt {
+        height: 1;
+        min-height: 1;
+        max-height: 1;
+        dock: bottom;
+        background: $surface;
+        color: $text;
+    }
+
+    .search-prompt {
+        background: $primary;
+        color: $text;
+        text-style: bold;
+    }
     """
 
     def compose(self) -> ComposeResult:
@@ -92,6 +114,7 @@ class DatabaseExplorer(App):
             id="main-container",
         )
         yield Log(id="debug-log", max_lines=3)
+        yield Label("", id="search-prompt", classes="search-prompt")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -292,20 +315,16 @@ class DatabaseExplorer(App):
         ):
             logger.debug("Collapsing node in tree view")
             cursor_node = self.tree_manager.tree.cursor_node
-            # For tree view, left means collapse if expanded, otherwise move left
+            # For tree view, left means collapse if expanded
             if cursor_node and cursor_node.is_expanded:
                 self.tree_manager.tree.action_toggle_node()
+            # For column nodes (leaf nodes), do nothing
+            elif cursor_node and cursor_node.data and cursor_node.data.get("type") == "column":
+                logger.debug("No-op: 'h' pressed on column node")
+            # For table nodes, move cursor to parent (which is root)
             elif cursor_node and cursor_node != self.tree_manager.tree.root:
-                # Only try to move left if not on root node and there is a parent
-                if (
-                    getattr(cursor_node, "parent", None)
-                    and cursor_node.parent != self.tree_manager.tree.root
-                ):
-                    self.tree_manager.tree.action_cursor_left()
-                else:
-                    logger.debug(
-                        "No-op: 'h' pressed on node without parent (table or column)"
-                    )
+                logger.debug("Moving to parent node")
+                self.tree_manager.tree.cursor_node = cursor_node.parent
         elif self.data_manager and self.data_manager.table:
             logger.debug("Moving left in data table")
             self.data_manager.table.action_cursor_left()
@@ -384,6 +403,86 @@ class DatabaseExplorer(App):
             logger.debug("Going to end in data table")
             self.data_manager.table.action_cursor_end()
 
+    def _find_all_tree_nodes(self):
+        """Collect all nodes from the tree for search."""
+        nodes = []
+        if not self.tree_manager or not self.tree_manager.tree:
+            return nodes
+        tree = self.tree_manager.tree
+        # Use tree's walk method if available, or manually traverse
+        stack = [tree.root]
+        while stack:
+            node = stack.pop()
+            if node != tree.root:  # Skip root
+                nodes.append(node)
+            for child in node.children:
+                stack.append(child)
+        return nodes
+
+    def _perform_search(self, term: str):
+        """Search tree nodes for matching labels."""
+        self.search_term = term
+        nodes = self._find_all_tree_nodes()
+        self.search_matches = []
+        for node in nodes:
+            if term.lower() in node.label.lower():
+                self.search_matches.append(node)
+        self.current_match_index = 0 if self.search_matches else -1
+        return self.search_matches
+
+    def _highlight_current_match(self):
+        """Highlight the current search match in the tree."""
+        if not self.search_matches or self.current_match_index < 0:
+            return
+        match = self.search_matches[self.current_match_index]
+        if self.tree_manager and self.tree_manager.tree:
+            self.tree_manager.tree.cursor_node = match
+            # Scroll to make the node visible
+            try:
+                line = self.tree_manager.tree.get_node_line(match)
+                self.tree_manager.tree.scroll_to_line(line)
+            except AttributeError:
+                # Fallback: try to scroll to cursor
+                self.tree_manager.tree.scroll_cursor()
+
+    def action_search(self) -> None:
+        """Start search mode (press '/')."""
+        if not self.tree_manager or not self.tree_manager.tree:
+            return
+        # Only enable search when tree has focus
+        if not self.tree_manager.tree.has_focus:
+            return
+        logger.debug("Starting search mode")
+        self.search_mode = True
+        self.search_term = ""
+        self.search_matches = []
+        self.current_match_index = -1
+        search_prompt = self.query_one("#search-prompt", Label)
+        if search_prompt:
+            search_prompt.update("/")
+        # Focus on the tree to pick up subsequent key events
+        self.tree_manager.tree.focus()
+
+    def action_search_next(self) -> None:
+        """Go to next search match (press 'n')."""
+        if not self.search_matches or self.current_match_index < 0:
+            return
+        self.current_match_index = (self.current_match_index + 1) % len(self.search_matches)
+        self._highlight_current_match()
+        search_prompt = self.query_one("#search-prompt", Label)
+        if search_prompt:
+            search_prompt.update(f"/{self.search_term} ({self.current_match_index + 1}/{len(self.search_matches)})")
+
+    def action_search_previous(self) -> None:
+        """Go to previous search match (press 'N')."""
+        if not self.search_matches or self.current_match_index < 0:
+            return
+        self.current_match_index = (self.current_match_index - 1) % len(self.search_matches)
+        self._highlight_current_match()
+        search_prompt = self.query_one("#search-prompt", Label)
+        if search_prompt:
+            search_prompt.update(f"/{self.search_term} ({self.current_match_index + 1}/{len(self.search_matches)})")
+
     def on_key(self, event):
         from textual.events import Key
 
@@ -391,6 +490,48 @@ class DatabaseExplorer(App):
             # Always trigger stats for the current selection
             self.action_show_stats()
             event.stop()
+
+        # Handle search input
+        if isinstance(event, Key) and self.search_mode:
+            if event.key == "escape":
+                # Cancel search
+                self.search_mode = False
+                self.search_term = ""
+                self.search_matches = []
+                self.current_match_index = -1
+                search_prompt = self.query_one("#search-prompt", Label)
+                if search_prompt:
+                    search_prompt.update("")
+                event.stop()
+            elif event.key == "enter":
+                # Execute search
+                if self.search_term:
+                    self._perform_search(self.search_term)
+                    if self.search_matches:
+                        self._highlight_current_match()
+                        search_prompt = self.query_one("#search-prompt", Label)
+                        if search_prompt:
+                            search_prompt.update(f"/{self.search_term} ({self.current_match_index + 1}/{len(self.search_matches)})")
+                    else:
+                        search_prompt = self.query_one("#search-prompt", Label)
+                        if search_prompt:
+                            search_prompt.update(f"/{self.search_term} (0 matches)")
+                self.search_mode = False
+                event.stop()
+            elif event.key == "backspace":
+                # Remove last character from search term
+                self.search_term = self.search_term[:-1]
+                search_prompt = self.query_one("#search-prompt", Label)
+                if search_prompt:
+                    search_prompt.update(f"/{self.search_term}")
+                event.stop()
+            elif len(event.key) == 1 and event.key.isprintable() and event.key != "/":
+                # Add character to search term
+                self.search_term += event.key
+                search_prompt = self.query_one("#search-prompt", Label)
+                if search_prompt:
+                    search_prompt.update(f"/{self.search_term}")
+                event.stop()
 
 
 def main():
