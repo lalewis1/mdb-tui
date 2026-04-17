@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Handles all database operations for Access databases."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, user: str = None, password: str = None):
         self.db_path = db_path
+        self.user = user
+        self.password = password
         self.connection = None
         self.is_32bit = sys.maxsize <= 2**32
 
@@ -23,9 +25,12 @@ class DatabaseManager:
 
             for driver in drivers:
                 try:
-                    connection_string = (
-                        f"DRIVER={{{driver}}};" f"DBQ={self.db_path};" "ReadOnly=True;"
-                    )
+                    connection_string = f"DRIVER={{{driver}}};DBQ={self.db_path};"
+                    if self.user:
+                        connection_string += f"UID={self.user};"
+                    if self.password:
+                        connection_string += f"PWD={self.password};"
+                    connection_string += "ReadOnly=True;"
                     logger.info(f"Trying driver: {driver}")
                     self.connection = pyodbc.connect(connection_string)
                     logger.info(f"Successfully connected using driver: {driver}")

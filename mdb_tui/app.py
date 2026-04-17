@@ -43,9 +43,9 @@ class DatabaseExplorer(App):
         Binding("escape", "return_to_tree", "Return to Tree", show=False),
     ]
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, user: str = None, password: str = None):
         self.db_path = db_path
-        self.db_manager = DatabaseManager(db_path)
+        self.db_manager = DatabaseManager(db_path, user, password)
         self.tree_manager = None
         self.data_manager = None
         self.status_manager = None
@@ -542,21 +542,26 @@ class DatabaseExplorer(App):
 
 def main():
     """Main entry point."""
-    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="mdb-tui - A TUI for exploring Access databases"
+    )
+    parser.add_argument("database_path", help="Path to the Access database file")
+    parser.add_argument(
+        "-u", "--user", help="Username for database authentication (UID)"
+    )
+    parser.add_argument(
+        "-p", "--pwd", help="Password for database authentication (PWD)"
+    )
+    args = parser.parse_args()
 
     # Set up logging for the main function
-    logger.info(f"mdb-tui starting with arguments: {sys.argv}")
+    logger.info(f"mdb-tui starting with arguments: {args}")
 
-    if len(sys.argv) != 2:
-        logger.error("No database path provided")
-        is_32bit = sys.maxsize <= 2**32
-        print("Usage: mdb-tui <database_path>")
-        print("Example: mdb-tui C:\\path\\to\\database.mdb")
-        print(f"Current Python architecture: {'32-bit' if is_32bit else '64-bit'}")
-        print("Debug log saved to mdb-tui.debug.log")
-        sys.exit(1)
-
-    db_path = sys.argv[1]
+    db_path = args.database_path
+    user = args.user
+    password = args.pwd
 
     # Check if file exists
     # Handle Windows paths and normalize path separators
@@ -598,7 +603,7 @@ def main():
 
     try:
         logger.info(f"Creating DatabaseExplorer for: {db_path}")
-        app = DatabaseExplorer(db_path)
+        app = DatabaseExplorer(db_path, user, password)
         logger.info("Starting Textual application")
         app.run()
     except Exception as e:
