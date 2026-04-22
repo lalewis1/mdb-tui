@@ -97,7 +97,7 @@ class DatabaseManager:
             cursor = self.connection.cursor()
             cursor.columns(table=table_name)
             try:
-                column_names = [row.column_name for row in cursor.fetchall()]
+                column_names = [row.column_name for row in cursor.fetchall() if not isinstance(row.column_name, bytes)]
             except Exception:
                 column_names = ['error', 'was', 'here']
             return column_names
