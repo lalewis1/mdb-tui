@@ -2,7 +2,8 @@
 
 import logging
 import sys
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import pyodbc
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,9 @@ class DatabaseManager:
 
         # Get tables
         cursor.tables(tableType="TABLE")
-        tables = [{"name": row.table_name, "type": "TABLE"} for row in cursor.fetchall()]
+        tables = [
+            {"name": row.table_name, "type": "TABLE"} for row in cursor.fetchall()
+        ]
 
         # Get views
         cursor.tables(tableType="VIEW")
@@ -94,17 +97,32 @@ class DatabaseManager:
 
         try:
             logger.info(f"Getting columns for table: {table_name}")
-            cursor: pyodbc.Cursor = self.connection.cursor()
+            cursor = self.connection.cursor()
             cursor.columns(table=table_name)
-            column_names = []
-            while True:
-                try:
-                    row = cursor.fetchone()
-                    column_names.append(row.column_name)
-                except Exception as e:
-                    column_names.append(str(e))
-                    break
-            return column_names
+            try:
+                return [row.column_name for row in cursor.fetchall()]
+            except UnicodeDecodeError:
+
+                def decode_sketchy_utf16(raw_bytes):
+                    s = raw_bytes.decode("utf-16le", "ignore")
+                    try:
+                        n = s.index("\u0000")
+                        s = s[:n]  # respect null terminator
+                    except ValueError:
+                        pass
+                    return s
+
+                prev_converter = self.connection.get_output_converter(
+                    pyodbc.SQL_WVARCHAR
+                )
+                self.connection.add_output_converter(
+                    pyodbc.SQL_WVARCHAR, decode_sketchy_utf16
+                )
+                column_names = [row.column_name for row in cursor.fetchall()]
+                self.connection.add_output_converter(
+                    pyodbc.SQL_WVARCHAR, prev_converter
+                )  # restore previous behaviour
+                return column_names
 
         except Exception as e:
             logger.error(f"Error getting columns for table {table_name}: {e}")
@@ -167,8 +185,14 @@ class DatabaseManager:
             )
             cursor.execute(sql)
             result = cursor.fetchone()
-            row_count = int(result.row_count) if result and result.row_count is not None else 0
-            null_count = int(result.null_count) if result and result.null_count is not None else 0
+            row_count = (
+                int(result.row_count) if result and result.row_count is not None else 0
+            )
+            null_count = (
+                int(result.null_count)
+                if result and result.null_count is not None
+                else 0
+            )
 
             # Count distinct values
             distinct_sql = (
@@ -178,7 +202,11 @@ class DatabaseManager:
             )
             cursor.execute(distinct_sql)
             distinct_result = cursor.fetchone()
-            distinct_count = int(distinct_result.distinct_count) if distinct_result and distinct_result.distinct_count is not None else 0
+            distinct_count = (
+                int(distinct_result.distinct_count)
+                if distinct_result and distinct_result.distinct_count is not None
+                else 0
+            )
 
             return {
                 "row_count": row_count,
