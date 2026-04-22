@@ -96,7 +96,11 @@ class DatabaseManager:
             logger.info(f"Getting columns for table: {table_name}")
             cursor = self.connection.cursor()
             cursor.columns(table=table_name)
-            return [row.column_name for row in cursor.fetchall()]
+            try:
+                column_names = [row.column_name for row in cursor.fetchall()]
+            except Exception:
+                column_names = ['error', 'was', 'here']
+            return column_names
 
         except Exception as e:
             logger.error(f"Error getting columns for table {table_name}: {e}")
