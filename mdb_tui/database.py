@@ -102,26 +102,13 @@ class DatabaseManager:
             try:
                 return [row.column_name for row in cursor.fetchall()]
             except Exception:
+                def decode_sketchy_utf8(raw_bytes):
+                    null_terminated_bytes = raw_bytes.split(b'\x00')[0]
+                    return null_terminated_bytes.decode('utf-8')
 
-                def decode_sketchy_utf16(raw_bytes):
-                    s = raw_bytes.decode("utf-16le", "ignore")
-                    try:
-                        n = s.index("\u0000")
-                        s = s[:n]  # respect null terminator
-                    except ValueError:
-                        pass
-                    return s
-
-                prev_converter = self.connection.get_output_converter(
-                    pyodbc.SQL_WVARCHAR
-                )
-                self.connection.add_output_converter(
-                    pyodbc.SQL_WVARCHAR, decode_sketchy_utf16
-                )
+                self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
                 column_names = [row.column_name for row in cursor.fetchall()]
-                self.connection.add_output_converter(
-                    pyodbc.SQL_WVARCHAR, prev_converter
-                )  # restore previous behaviour
+                self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
                 return column_names
 
         except Exception as e:
