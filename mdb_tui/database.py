@@ -101,7 +101,7 @@ class DatabaseManager:
             cursor.columns(table=table_name)
             try:
                 return [row.column_name for row in cursor.fetchall()]
-            except UnicodeDecodeError:
+            except Exception:
 
                 def decode_sketchy_utf16(raw_bytes):
                     s = raw_bytes.decode("utf-16le", "ignore")
