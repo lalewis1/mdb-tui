@@ -102,6 +102,7 @@ class DatabaseManager:
             try:
                 return [row.column_name for row in cursor.fetchall()]
             except Exception:
+                # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
                 def decode_sketchy_utf8(raw_bytes):
                     null_terminated_bytes = raw_bytes.split(b'\x00')[0]
                     return null_terminated_bytes.decode('utf-8')
@@ -133,7 +134,16 @@ class DatabaseManager:
                 cursor.execute(sql)
 
             # Get column names
-            columns = [column[0] for column in cursor.description]
+            try:
+                columns = [column[0] for column in cursor.description]
+            except Exception:
+                # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
+                def decode_sketchy_utf8(raw_bytes):
+                    null_terminated_bytes = raw_bytes.split(b'\x00')[0]
+                    return null_terminated_bytes.decode('utf-8')
+
+                self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
+                columns = [row.column_name for row in cursor.fetchall()]
 
             # Get data
             data = cursor.fetchall()
