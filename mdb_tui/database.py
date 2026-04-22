@@ -96,10 +96,12 @@ class DatabaseManager:
             logger.info(f"Getting columns for table: {table_name}")
             cursor = self.connection.cursor()
             cursor.columns(table=table_name)
-            try:
-                column_names = [row.column_name for row in cursor.fetchall() if not isinstance(row.column_name, bytes)]
-            except Exception:
-                column_names = ['error', 'was', 'here']
+            column_names = []
+            for row in cursor.fetchall():
+                try:
+                    column_names.append(row.column_name)
+                except Exception as e:
+                    column_names.append(str(e))
             return column_names
 
         except Exception as e:
