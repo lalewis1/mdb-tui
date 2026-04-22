@@ -94,14 +94,16 @@ class DatabaseManager:
 
         try:
             logger.info(f"Getting columns for table: {table_name}")
-            cursor = self.connection.cursor()
+            cursor: pyodbc.Cursor = self.connection.cursor()
             cursor.columns(table=table_name)
             column_names = []
-            for row in cursor.fetchall():
+            while True:
                 try:
+                    row = cursor.fetchone()
                     column_names.append(row.column_name)
                 except Exception as e:
                     column_names.append(str(e))
+                    break
             return column_names
 
         except Exception as e:
