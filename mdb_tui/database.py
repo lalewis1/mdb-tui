@@ -108,7 +108,7 @@ class DatabaseManager:
                     return null_terminated_bytes.decode('utf-8')
 
                 self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
-                column_names = [row.column_name for row in cursor.fetchall()]
+                column_names = [f"{row.column_name} ({row.column_size})" for row in cursor.fetchall()]
                 self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
                 return column_names
 

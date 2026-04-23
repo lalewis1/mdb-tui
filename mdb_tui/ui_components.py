@@ -1,9 +1,10 @@
 """UI components for database explorer."""
 
 import logging
-from textual.widgets import DataTable, Tree, Label, Log
+from typing import Any, Dict, List
+
 from textual.app import App
-from typing import List, Dict, Any
+from textual.widgets import DataTable, Label, Log, Tree
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +35,18 @@ class DatabaseTreeManager:
         for table_info in tables:
             table_name = table_info["name"]
             table_type = table_info.get("type", "TABLE")
-            
+
             # Use different display for VIEW vs TABLE
             display_name = table_name
             if table_type == "VIEW":
                 display_name = f"👁️  {display_name}"
-            
+
             table_node = root.add(display_name)
-            table_node.data = {"type": "table", "name": table_name, "table_type": table_type}
+            table_node.data = {
+                "type": "table",
+                "name": table_name,
+                "table_type": table_type,
+            }
             table_node.allow_expand = True
 
             # Add placeholder child
@@ -156,7 +161,7 @@ class DataTableManager:
         # Remove all columns to ensure clean state
         for column in list(self.table.columns):
             self.table.remove_column(column)
-        
+
         self.table.clear()
 
         # Add columns
@@ -191,7 +196,7 @@ class DataTableManager:
                     f"Column '{clean_column_name}' selected", severity="info"
                 )
                 # Scroll to make the column visible
-                if hasattr(self.table, 'cursor_column'):
+                if hasattr(self.table, "cursor_column"):
                     self.table.cursor_column = column_index
 
         except Exception as e:
