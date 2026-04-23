@@ -91,16 +91,21 @@ class DatabaseManager:
 
     def get_table_columns(self, table_name: str) -> List[str]:
         """Get column names for a specific table."""
+        if not self.connection:
+            raise Exception("Database not connected")
         if not table_name:
             logger.warning("Empty table name provided")
             return []
 
         try:
             logger.info(f"Getting columns for table: {table_name}")
-            cursor: pyodbc.Cursor = self.connection.cursor()
-            cursor.columns(table=table_name)
+            cursor = self.connection.cursor()
+            safe_table_name = self._quote_identifier(table_name)
+
+            sql = f"SELECT TOP 1 * FROM {safe_table_name}"
+            cursor.execute(sql)
             try:
-                return [row.column_name for row in cursor.fetchall()]
+                return [column[0] for column in cursor.description]
             except Exception:
                 # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
                 def decode_sketchy_utf8(raw_bytes):
@@ -108,9 +113,9 @@ class DatabaseManager:
                     return null_terminated_bytes.decode('utf-8')
 
                 self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
-                column_names = [row.column_name for row in cursor.fetchall()]
+                columns = [column[0] for column in cursor.description]
                 self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
-                return column_names
+                return columns
 
         except Exception as e:
             logger.error(f"Error getting columns for table {table_name}: {e}")
@@ -159,13 +164,14 @@ class DatabaseManager:
             safe_table = self._quote_identifier(table_name)
             safe_column = self._quote_identifier(column_name)
 
-            # Get data type from columns metadata
-            cursor.columns(table=table_name)
-            column_info = None
-            for row in cursor.fetchall():
-                if row.column_name == column_name:
-                    column_info = row
-                    break
+            # Get data type using SQL query
+            type_sql = (
+                f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
+                f"WHERE TABLE_NAME = '{table_name}' AND COLUMN_NAME = '{column_name}'"
+            )
+            cursor.execute(type_sql)
+            type_result = cursor.fetchone()
+            data_type = str(type_result.DATA_TYPE) if type_result else "unknown"
 
             # Count rows and nulls
             sql = (
@@ -202,7 +208,7 @@ class DatabaseManager:
                 "row_count": row_count,
                 "null_count": null_count,
                 "distinct_count": distinct_count,
-                "data_type": str(column_info.type_name) if column_info else "unknown",
+                "data_type": data_type,
                 "stats_sql": sql,
                 "distinct_sql": distinct_sql,
             }
