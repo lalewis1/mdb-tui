@@ -97,6 +97,7 @@ class DatabaseManager:
             logger.warning("Empty table name provided")
             return []
 
+        # First try: use SELECT TOP 1 * FROM table
         try:
             logger.info(f"Getting columns for table: {table_name}")
             cursor = self.connection.cursor()
@@ -116,6 +117,24 @@ class DatabaseManager:
                 columns = [column[0] for column in cursor.description]
                 self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
                 return columns
+
+        except pyodbc.ProgrammingError as e:
+            # Access may throw "too few parameters" for views with parameter queries
+            # Fall back to cursor.columns() metadata API
+            logger.warning(f"SQL query failed for {table_name}, falling back to cursor.columns(): {e}")
+            try:
+                cursor2 = self.connection.cursor()
+                cursor2.columns(table=table_name)
+                try:
+                    return [row.column_name for row in cursor2.fetchall()]
+                except Exception:
+                    self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
+                    columns = [row.column_name for row in cursor2.fetchall()]
+                    self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
+                    return columns
+            except Exception as e2:
+                logger.error(f"cursor.columns() also failed for {table_name}: {e2}")
+                raise
 
         except Exception as e:
             logger.error(f"Error getting columns for table {table_name}: {e}")
@@ -192,52 +211,72 @@ class DatabaseManager:
             safe_column = self._quote_identifier(column_name)
 
             # Get column type from SELECT TOP 1 * query
-            sql_columns = f"SELECT TOP 1 * FROM {safe_table}"
-            cursor.execute(sql_columns)
             data_type = "unknown"
-            for col in cursor.description:
-                if col[0] == column_name:
-                    data_type = self._get_type_name(col[1])
-                    break
+            try:
+                sql_columns = f"SELECT TOP 1 * FROM {safe_table}"
+                cursor.execute(sql_columns)
+                for col in cursor.description:
+                    if col[0] == column_name:
+                        data_type = self._get_type_name(col[1])
+                        break
+            except pyodbc.ProgrammingError as e:
+                # Access may throw "too few parameters" for views with parameter queries
+                # Fall back to cursor.columns() metadata API for type info
+                logger.warning(f"SQL query failed for {table_name}, falling back to cursor.columns(): {e}")
+                try:
+                    cursor2 = self.connection.cursor()
+                    cursor2.columns(table=table_name)
+                    for row in cursor2.fetchall():
+                        if row.column_name == column_name:
+                            data_type = str(row.type_name)
+                            break
+                except Exception as e2:
+                    logger.error(f"cursor.columns() also failed for {table_name}: {e2}")
 
             # Count rows and nulls
-            sql = (
-                f"SELECT COUNT(*) as row_count, "
-                f"SUM(IIF({safe_column} IS NULL OR {safe_column}='',1,0)) as null_count "
-                f"FROM {safe_table}"
-            )
-            cursor.execute(sql)
-            result = cursor.fetchone()
-            row_count = (
-                int(result.row_count) if result and result.row_count is not None else 0
-            )
-            null_count = (
-                int(result.null_count)
-                if result and result.null_count is not None
-                else 0
-            )
+            row_count = 0
+            null_count = 0
+            distinct_count = 0
+            try:
+                sql = (
+                    f"SELECT COUNT(*) as row_count, "
+                    f"SUM(IIF({safe_column} IS NULL OR {safe_column}='',1,0)) as null_count "
+                    f"FROM {safe_table}"
+                )
+                cursor.execute(sql)
+                result = cursor.fetchone()
+                row_count = (
+                    int(result.row_count) if result and result.row_count is not None else 0
+                )
+                null_count = (
+                    int(result.null_count)
+                    if result and result.null_count is not None
+                    else 0
+                )
 
-            # Count distinct values
-            distinct_sql = (
-                f"SELECT COUNT(*) AS distinct_count FROM "
-                f"(SELECT DISTINCT {safe_column} FROM {safe_table} "
-                f"WHERE {safe_column} IS NOT NULL AND {safe_column} <> '') AS DQ"
-            )
-            cursor.execute(distinct_sql)
-            distinct_result = cursor.fetchone()
-            distinct_count = (
-                int(distinct_result.distinct_count)
-                if distinct_result and distinct_result.distinct_count is not None
-                else 0
-            )
+                # Count distinct values
+                distinct_sql = (
+                    f"SELECT COUNT(*) AS distinct_count FROM "
+                    f"(SELECT DISTINCT {safe_column} FROM {safe_table} "
+                    f"WHERE {safe_column} IS NOT NULL AND {safe_column} <> '') AS DQ"
+                )
+                cursor.execute(distinct_sql)
+                distinct_result = cursor.fetchone()
+                distinct_count = (
+                    int(distinct_result.distinct_count)
+                    if distinct_result and distinct_result.distinct_count is not None
+                    else 0
+                )
+            except pyodbc.ProgrammingError as e:
+                logger.warning(f"Stats queries failed for {table_name}.{column_name}: {e}")
 
             return {
                 "row_count": row_count,
                 "null_count": null_count,
                 "distinct_count": distinct_count,
                 "data_type": data_type,
-                "stats_sql": sql,
-                "distinct_sql": distinct_sql,
+                "stats_sql": sql if 'sql' in locals() else "",
+                "distinct_sql": distinct_sql if 'distinct_sql' in locals() else "",
             }
 
         except Exception as e:
