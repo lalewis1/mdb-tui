@@ -7,6 +7,7 @@ import sys
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, ScrollableContainer
+from textual.events import Key
 from textual.widgets import DataTable, Footer, Header, Label, Log, Tree
 
 from .database import DatabaseManager
@@ -21,11 +22,11 @@ from .ui_components import (
 class DatabaseTree(Tree):
     """Custom Tree widget that only expands nodes on Enter (never collapses)."""
 
-    async def on_key(self, event) -> None:
+    async def on_key(self, event: Key) -> None:
         if event.key == "enter":
             # Only expand, never collapse
             if self.cursor_node and not self.cursor_node.is_expanded:
-                await self.action_expand_node()
+                self.cursor_node.expand()
             event.stop()
         else:
             await super().on_key(event)
