@@ -17,6 +17,19 @@ from .ui_components import (
     LoggerManager,
 )
 
+
+class DatabaseTree(Tree):
+    """Custom Tree widget that only expands nodes on Enter (never collapses)."""
+
+    async def on_key(self, event) -> None:
+        if event.key == "enter":
+            # Only expand, never collapse
+            if self.cursor_node and not self.cursor_node.is_expanded:
+                await self.action_expand_node()
+            event.stop()
+        else:
+            await super().on_key(event)
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -102,7 +115,7 @@ class DatabaseExplorer(App):
         yield Container(
             Container(
                 Label("Database Explorer", id="title"),
-                Tree("Database Structure", id="db-tree"),
+                DatabaseTree("Database Structure", id="db-tree"),
                 Label("Select a table or column to see details", id="column-summary"),
                 id="tree-container",
             ),
