@@ -152,6 +152,33 @@ class DatabaseManager:
             logger.error(f"Error getting data from table {table_name}: {e}")
             raise
 
+    def _get_type_name(self, type_code: int) -> str:
+        """Map pyodbc type code to human-readable type name."""
+        type_map = {
+            pyodbc.SQL_CHAR: "CHAR",
+            pyodbc.SQL_VARCHAR: "VARCHAR",
+            pyodbc.SQL_WVARCHAR: "VARCHAR",
+            pyodbc.SQL_LONGVARCHAR: "LONGVARCHAR",
+            pyodbc.SQL_WLONGVARCHAR: "TEXT",
+            pyodbc.SQL_DECIMAL: "DECIMAL",
+            pyodbc.SQL_NUMERIC: "NUMERIC",
+            pyodbc.SQL_SMALLINT: "SMALLINT",
+            pyodbc.SQL_INTEGER: "INTEGER",
+            pyodbc.SQL_REAL: "REAL",
+            pyodbc.SQL_FLOAT: "FLOAT",
+            pyodbc.SQL_DOUBLE: "DOUBLE",
+            pyodbc.SQL_BIT: "BOOLEAN",
+            pyodbc.SQL_TINYINT: "TINYINT",
+            pyodbc.SQL_BIGINT: "BIGINT",
+            pyodbc.SQL_TYPE_DATE: "DATE",
+            pyodbc.SQL_TYPE_TIME: "TIME",
+            pyodbc.SQL_TYPE_TIMESTAMP: "DATETIME",
+            pyodbc.SQL_BINARY: "BINARY",
+            pyodbc.SQL_VARBINARY: "VARBINARY",
+            pyodbc.SQL_LONGVARBINARY: "BLOB",
+        }
+        return type_map.get(type_code, f"UNKNOWN({type_code})")
+
     def get_column_statistics(
         self, table_name: str, column_name: str
     ) -> Dict[str, Any]:
@@ -164,14 +191,14 @@ class DatabaseManager:
             safe_table = self._quote_identifier(table_name)
             safe_column = self._quote_identifier(column_name)
 
-            # Get data type using SQL query
-            type_sql = (
-                f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
-                f"WHERE TABLE_NAME = '{safe_table}' AND COLUMN_NAME = '{safe_column}'"
-            )
-            cursor.execute(type_sql)
-            type_result = cursor.fetchone()
-            data_type = str(type_result.DATA_TYPE) if type_result else "unknown"
+            # Get column type from SELECT TOP 1 * query
+            sql_columns = f"SELECT TOP 1 * FROM {safe_table}"
+            cursor.execute(sql_columns)
+            data_type = "unknown"
+            for col in cursor.description:
+                if col[0] == column_name:
+                    data_type = self._get_type_name(col[1])
+                    break
 
             # Count rows and nulls
             sql = (
