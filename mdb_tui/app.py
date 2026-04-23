@@ -28,8 +28,7 @@ class DatabaseTree(Tree):
             if self.cursor_node and not self.cursor_node.is_expanded:
                 self.cursor_node.expand()
             event.stop()
-        else:
-            await super().on_key(event)
+        # Let other keys propagate normally
 
 logging.basicConfig(
     level=logging.DEBUG,
