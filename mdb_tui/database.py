@@ -167,7 +167,7 @@ class DatabaseManager:
             # Get data type using SQL query
             type_sql = (
                 f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
-                f"WHERE TABLE_NAME = '{table_name}' AND COLUMN_NAME = '{column_name}'"
+                f"WHERE TABLE_NAME = '{safe_table}' AND COLUMN_NAME = '{safe_column}'"
             )
             cursor.execute(type_sql)
             type_result = cursor.fetchone()
