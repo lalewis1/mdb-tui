@@ -146,7 +146,16 @@ class DatabaseManager:
                 columns = [row.column_name for row in cursor.fetchall()]
 
             # Get data
-            data = cursor.fetchall()
+            try:
+                data = cursor.fetchall()
+            except Exception:
+                # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
+                def decode_sketchy_utf8(raw_bytes):
+                    null_terminated_bytes = raw_bytes.split(b'\x00')[0]
+                    return null_terminated_bytes.decode('utf-8')
+
+                self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
+                data = cursor.fetchall()
 
             return {"columns": columns, "data": data, "sql": sql}
 
