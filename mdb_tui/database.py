@@ -125,28 +125,10 @@ class DatabaseManager:
             cursor = self.connection.cursor()
             safe_table_name = self._quote_identifier(table_name)
 
-            # Try TOP syntax first (Access), fallback to LIMIT
-            try:
-                sql = f"SELECT TOP {limit} * FROM {safe_table_name}"
-                cursor.execute(sql)
-            except pyodbc.Error:
-                sql = f"SELECT * FROM {safe_table_name} LIMIT {limit}"
-                cursor.execute(sql)
-
-            # Get column names
+            sql = f"SELECT TOP {limit} * FROM {safe_table_name}"
+            cursor.execute(sql)
             try:
                 columns = [column[0] for column in cursor.description]
-            except Exception:
-                # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
-                def decode_sketchy_utf8(raw_bytes):
-                    null_terminated_bytes = raw_bytes.split(b'\x00')[0]
-                    return null_terminated_bytes.decode('utf-8')
-
-                self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
-                columns = [row.column_name for row in cursor.fetchall()]
-
-            # Get data
-            try:
                 data = cursor.fetchall()
             except Exception:
                 # https://github.com/mkleehammer/pyodbc/issues/328#issuecomment-629641164
@@ -155,7 +137,9 @@ class DatabaseManager:
                     return null_terminated_bytes.decode('utf-8')
 
                 self.connection.add_output_converter(pyodbc.SQL_VARCHAR, decode_sketchy_utf8)
+                columns = [column[0] for column in cursor.description]
                 data = cursor.fetchall()
+                self.connection.remove_output_converter(pyodbc.SQL_VARCHAR)
 
             return {"columns": columns, "data": data, "sql": sql}
 
